@@ -8,7 +8,7 @@ import { CutBox } from "../components/shapes";
 import { Robo } from "../robo/Robo";
 import { colors, cut, type } from "../theme";
 import { openCheckout, useBillingDevice } from "./hooks";
-import { commissionArgs, commissionLine, startFailMessage, TOPIC_MAX, type CommissionStatus } from "./logic";
+import { commissionArgs, commissionLine, refusalMessage, startFailMessage, TOPIC_MAX, type CommissionStatus } from "./logic";
 import { BillingSheet, PencilIcon, SheetHeader, SmallButton } from "./Sheet";
 
 const DONE: CommissionStatus[] = ["ready", "failed", "refunded"];
@@ -20,7 +20,7 @@ export function CommissionButton() {
   if (!deviceId) return null;
   return (
     <>
-      <SmallButton testID="commissionButton" label="Commission" icon={<PencilIcon />} onPress={() => setOpen(true)} />
+      <SmallButton testID="commissionButton" label="Create" icon={<PencilIcon />} onPress={() => setOpen(true)} />
       <CommissionSheet
         deviceId={deviceId}
         visible={open}
@@ -59,7 +59,7 @@ function CommissionSheet({
   useEffect(() => {
     if (status !== "ready") return;
     const t = setTimeout(() => {
-      toast.show("Your commission is at the top of Today.");
+      toast.show("Your comic is at the top of Today.");
       setText("");
       onFinished();
       onClose();
@@ -74,7 +74,7 @@ function CommissionSheet({
     try {
       const res = await start({ deviceId, ...commissionArgs(text) });
       if (!res.ok) {
-        setError(startFailMessage(res.reason));
+        setError(res.message ?? refusalMessage(res.refusal) ?? startFailMessage(res.reason));
         return;
       }
       onStarted(res.commissionId);
@@ -93,7 +93,7 @@ function CommissionSheet({
 
   return (
     <BillingSheet visible={visible} onClose={onClose} testID="commissionSheet">
-      <SheetHeader title="Commission a comic" line="Robo draws anything, for $1." art={<Robo pose={status && !DONE.includes(status) ? "drawing" : "idle"} size={64} />} onClose={onClose} />
+      <SheetHeader title="Create a comic" line="Robo draws anything, for $1." art={<Robo pose={status && !DONE.includes(status) ? "drawing" : "idle"} size={64} />} onClose={onClose} />
       {status ? (
         <View style={styles.statusBox}>
           <CutBox cut={cut.card} fill={colors.surface[2]} stroke={status === "failed" || status === "refunded" ? colors.state.error : colors.neon.volt} style={styles.status}>

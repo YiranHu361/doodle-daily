@@ -1,8 +1,9 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withTiming } from "react-native-reanimated";
+import { StyleSheet, type LayoutChangeEvent, type StyleProp, type ViewStyle } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { colors } from "../theme";
-import { useHighContrast } from "./a11y";
+import { useHighContrast, useReducedMotion } from "./a11y";
 
 function jitter(seed: number, i: number): number {
   const x = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453;
@@ -32,6 +33,7 @@ export function PaperSheet({
   style,
   children,
   backlightRadius = 18,
+  arrived,
 }: {
   backlight?: string | null;
   seed?: number;
@@ -39,7 +41,16 @@ export function PaperSheet({
   style?: StyleProp<ViewStyle>;
   children?: ReactNode;
   backlightRadius?: number;
+  arrived?: boolean;
 }) {
+  const reduce = useReducedMotion();
+  const pulse = useSharedValue(0);
+  const wasArrived = useRef(arrived);
+  useEffect(() => {
+    if (arrived && wasArrived.current === false && !reduce) pulse.set(withSequence(withTiming(1, { duration: 180 }), withTiming(0, { duration: 520 })));
+    wasArrived.current = arrived;
+  }, [arrived, pulse, reduce]);
+  const pulseStyle = useAnimatedStyle(() => (pulse.value > 0 ? { shadowOpacity: 0.55 + 0.45 * pulse.value, shadowRadius: backlightRadius * (1 + pulse.value) } : {}));
   const [size, setSize] = useState({ w: 0, h: 0 });
   const highContrast = useHighContrast();
   const d = useMemo(() => (size.w > 0 ? wobblyPath(size.w, size.h, seed) : ""), [size, seed]);
@@ -52,13 +63,13 @@ export function PaperSheet({
       ? { shadowColor: backlight, shadowOpacity: 0.55, shadowRadius: backlightRadius, shadowOffset: { width: 0, height: 0 } }
       : null;
   return (
-    <View style={[light, { padding }, style]} onLayout={onLayout}>
+    <Animated.View style={[light, { padding }, style, light ? pulseStyle : null]} onLayout={onLayout}>
       {d ? (
         <Svg style={StyleSheet.absoluteFill} width={size.w} height={size.h} pointerEvents="none">
           <Path d={d} fill={colors.paper} stroke={colors.ink} strokeWidth={1.2} strokeOpacity={0.55} />
         </Svg>
       ) : null}
       {children}
-    </View>
+    </Animated.View>
   );
 }

@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { CHIPS, type Chip } from "../data/filter";
 import { colors, cut, sectionColor, sectionLabel, type } from "../theme";
 import { CutButton } from "./shapes";
@@ -7,7 +7,7 @@ const label = (chip: Chip) => (chip === "all" ? "All" : sectionLabel[chip]);
 
 export function ChipRow({ value, onChange }: { value: Chip; onChange: (chip: Chip) => void }) {
   return (
-    <View style={styles.row} accessibilityRole="tablist">
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bar} contentContainerStyle={styles.row} accessibilityRole="tablist">
       {CHIPS.map((chip) => {
         const selected = chip === value;
         const color = sectionColor[chip];
@@ -35,14 +35,15 @@ export function ChipRow({ value, onChange }: { value: Chip; onChange: (chip: Chi
           </CutButton>
         );
       })}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", gap: 6, paddingVertical: 10, paddingHorizontal: 16, backgroundColor: colors.bg.night },
-  chipOuter: { flexGrow: 1, flexShrink: 1 },
-  chip: { minHeight: 44, paddingHorizontal: 6 },
+  bar: { backgroundColor: colors.bg.night, flexGrow: 0 },
+  row: { flexGrow: 1, flexDirection: "row", gap: 6, paddingVertical: 10, paddingHorizontal: 16 },
+  chipOuter: { flexGrow: 1, flexShrink: 0 },
+  chip: { minHeight: 44, paddingHorizontal: 10 },
   inner: { flexDirection: "row", alignItems: "center", gap: 4 },
   dot: { width: 6, height: 6, borderRadius: 3 },
   text: { ...type.chip },

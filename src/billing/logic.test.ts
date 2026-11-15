@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { commissionArgs, commissionLine, freezeDay, isMilestone, looksLikeLink, parsePrice, rewardLine } from "./logic";
+import { commissionArgs, commissionLine, freezeDay, isMilestone, looksLikeLink, parsePrice, refusalMessage, rewardLine, startFailMessage } from "./logic";
 
 describe("billing logic", () => {
   test("a pasted link is sent as a link, anything else as a topic", () => {
@@ -26,5 +26,12 @@ describe("billing logic", () => {
   test("status lines tell the reader what happens", () => {
     expect(commissionLine("failed")).toMatch(/could not finish/);
     expect(rewardLine(Date.UTC(2026, 11, 16, 20))).toBe("Robo paid for a day. Plus now runs to Dec 16.");
+  });
+
+  test("a refused topic says why in plain words", () => {
+    expect(refusalMessage("tragedy")).toMatch(/crime and tragedy/);
+    expect(refusalMessage("needs_source")).toMatch(/Paste a link/);
+    expect(refusalMessage(undefined)).toBeNull();
+    expect(startFailMessage("not_allowed")).toBe("Robo skips stories about private lives, crime and tragedy. Try another topic.");
   });
 });

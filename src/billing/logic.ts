@@ -20,9 +20,9 @@ export function commissionLine(status: CommissionStatus): string {
     case "awaiting_payment":
       return "Waiting for your payment. Finish the checkout, then come back here.";
     case "paid":
-      return "Paid. Robo is sharpening crayons.";
+      return "Paid. Creating your comic.";
     case "drawing":
-      return "Robo is drawing it now.";
+      return "Creating your comic. Robo is drawing it now.";
     case "ready":
       return "Done! It's at the top of Today.";
     case "failed":
@@ -35,7 +35,7 @@ export function commissionLine(status: CommissionStatus): string {
 export function startFailMessage(reason: StartFailure): string {
   switch (reason) {
     case "not_allowed":
-      return "Robo keeps the paper friendly and won't draw that one. Try another topic.";
+      return "Robo skips stories about private lives, crime and tragedy. Try another topic.";
     case "spend_cap":
       return "Robo is out of crayons for today. Try again tomorrow.";
     case "bad_input":
@@ -43,6 +43,23 @@ export function startFailMessage(reason: StartFailure): string {
     case "unavailable":
     case "error":
       return "Checkout isn't available right now. Try again in a minute.";
+  }
+}
+
+export type Refusal = "needs_source" | "private_life" | "tragedy" | "private_person";
+
+export function refusalMessage(refusal: Refusal | undefined): string | null {
+  switch (refusal) {
+    case "needs_source":
+      return "That one needs a source. Paste a link to the article and Robo will draw it.";
+    case "private_life":
+      return "Robo skips stories about people's private lives. Try another topic.";
+    case "tragedy":
+      return "Robo skips stories about crime and tragedy. Try another topic.";
+    case "private_person":
+      return "Robo only draws public figures, not private people. Try another topic.";
+    default:
+      return null;
   }
 }
 

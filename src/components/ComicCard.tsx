@@ -1,9 +1,12 @@
+import { useRef } from "react";
 import { useWindowDimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
 import { panelsDrawn } from "../data/filter";
 import type { Comic } from "../data/types";
 import { copy } from "../theme/copy";
 import { colors, cut, sectionColor, sectionLabel, space, type } from "../theme";
+import { useReducedMotion } from "./a11y";
+import { launchFlight, measure, type ViewRef } from "./Flight";
 import { CutBox } from "./shapes";
 import { PaperSheet } from "./Paper";
 import { PanelImage, Scribble } from "./PanelImage";
@@ -32,13 +35,23 @@ export function ComicCard({
   const drawn = panelsDrawn(comic);
   const coverSize = lead ? width - space.margin * 2 - 24 - 16 : 96 - 12;
   const sublabel = drawing ? `${copy.drawingCard}, ${copy.panelsOf(drawn)}` : "";
+  const reduce = useReducedMotion();
+  const coverRef = useRef<ViewRef>(null);
+  const press = async () => {
+    const uri = cover.imageUrl;
+    if (!reduce && ready && uri) {
+      const rect = await measure(coverRef.current);
+      if (rect) launchFlight(comic._id, uri, color, rect);
+    }
+    onPress();
+  };
   return (
     <Animated.View entering={FadeIn.duration(200)} layout={LinearTransition.duration(200)}>
       <Pressable
         testID={`comicCard_${index}`}
         accessibilityRole="button"
-        accessibilityLabel={`${sectionLabel[comic.section]}: ${comic.title}${read ? ", read" : ""}${comic.isNew ? ", new" : ""}${sublabel ? `, ${sublabel}` : ""}`}
-        onPress={onPress}
+        accessibilityLabel={`${sectionLabel[comic.section]}: ${comic.title}${read ? ", read" : ""}${comic.kind === "commission" ? ", created for you" : comic.isNew ? ", new" : ""}${sublabel ? `, ${sublabel}` : ""}`}
+        onPress={() => void press()}
       >
         <CutBox
           cut={cut.card}
@@ -48,8 +61,10 @@ export function ComicCard({
           glow={lead && ready ? color : null}
           style={lead ? styles.lead : styles.row}
         >
-          <PaperSheet backlight={color} seed={index + 3} padding={lead ? 8 : 6} backlightRadius={lead ? 16 : 8}>
-            <PanelImage uri={cover.imageUrl} size={coverSize} label={cover.scene || comic.title} placeholderLabel={copy.drawingCard} />
+          <PaperSheet backlight={color} seed={index + 3} padding={lead ? 8 : 6} backlightRadius={lead ? 16 : 8} arrived={cover.imageUrl !== null}>
+            <View ref={coverRef} collapsable={false}>
+              <PanelImage uri={cover.imageUrl} size={coverSize} label={cover.scene || comic.title} placeholderLabel={copy.drawingCard} />
+            </View>
           </PaperSheet>
           <View style={lead ? styles.leadText : styles.rowText}>
             <SectionTag section={comic.section} />
@@ -61,7 +76,7 @@ export function ComicCard({
             ) : null}
           </View>
           {read ? <ReadStamp /> : null}
-          {comic.isNew ? <NewBadge /> : null}
+          {comic.kind === "commission" ? <NewBadge label="CREATED" /> : comic.isNew ? <NewBadge /> : null}
         </CutBox>
       </Pressable>
     </Animated.View>

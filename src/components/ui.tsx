@@ -99,7 +99,7 @@ export function ReadStamp({ style }: { style?: StyleProp<ViewStyle> }) {
   );
 }
 
-export function NewBadge({ style }: { style?: StyleProp<ViewStyle> }) {
+export function NewBadge({ style, label = "NEW" }: { style?: StyleProp<ViewStyle>; label?: string }) {
   const reduce = useReducedMotion();
   const scale = useSharedValue(reduce ? 1 : 0.2);
   useEffect(() => {
@@ -107,9 +107,9 @@ export function NewBadge({ style }: { style?: StyleProp<ViewStyle> }) {
   }, [reduce, scale]);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }, { rotate: "-6deg" }] }));
   return (
-    <Animated.View style={[styles.newBadge, anim, style]} accessibilityLabel="New" accessible pointerEvents="none">
+    <Animated.View style={[styles.newBadge, anim, style]} accessibilityLabel={label === "NEW" ? "New" : "Created"} accessible pointerEvents="none">
       <Text style={styles.newText} maxFontSizeMultiplier={1.2}>
-        NEW
+        {label}
       </Text>
     </Animated.View>
   );

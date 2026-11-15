@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -72,6 +72,7 @@ function CelebrationView({ celebration, onDone }: { celebration: Celebration; on
 
   useEffect(() => {
     const at = (ms: number, fn: () => void) => timers.current.push(setTimeout(fn, ms));
+    AccessibilityInfo.announceForAccessibility(`${copy.dayCleared}. ${celebration.to} ${copy.dayCombo}. ${celebration.bubble}`);
     if (reduced) {
       all.forEach((v) => (v.value = withTiming(1, { duration: springs.fadeMs })));
       at(springs.fadeMs, () => setRest(true));
@@ -91,8 +92,16 @@ function CelebrationView({ celebration, onDone }: { celebration: Celebration; on
     at(T.title + 140, () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined));
     const steps = Math.max(1, celebration.to - celebration.from);
     const stepMs = Math.min(150, 450 / steps);
-    for (let i = 1; i <= steps; i++) at(T.number + i * stepMs, () => setCount(Math.min(celebration.to, celebration.from + i)));
-    at(T.week, () => setTodayLit(true));
+    for (let i = 1; i <= steps; i++)
+      at(T.number + i * stepMs, () => {
+        setCount(Math.min(celebration.to, celebration.from + i));
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+      });
+    at(T.confetti, () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined));
+    at(T.week, () => {
+      setTodayLit(true);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => undefined);
+    });
     at(T.rest, () => setRest(true));
     return () => timers.current.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -194,7 +203,7 @@ function Piece({ burst, color, dx, dy, spin, w, h }: { burst: SharedValue<number
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: "rgba(7,5,26,0.95)" },
+  dim: { backgroundColor: "rgba(7,5,26,0.97)" },
   column: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, gap: 10 },
   title: { ...type.displayLg, fontSize: 40, color: colors.neon.volt, textAlign: "center", textShadowColor: colors.neon.volt, textShadowRadius: 12 },
   numberRow: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -202,7 +211,7 @@ const styles = StyleSheet.create({
   comboLabel: { ...type.body, color: colors.text.mid, marginTop: -8 },
   week: { alignSelf: "stretch", marginTop: 12 },
   bubble: { backgroundColor: colors.paper, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 18, marginTop: 14, maxWidth: 320 },
-  bubbleTail: { position: "absolute", top: -8, left: 40, width: 16, height: 16, backgroundColor: colors.paper, transform: [{ rotate: "45deg" }] },
+  bubbleTail: { position: "absolute", top: -8, left: "50%", marginLeft: -8, width: 16, height: 16, backgroundColor: colors.paper, transform: [{ rotate: "45deg" }] },
   bubbleText: { ...type.caption, color: colors.ink, textAlign: "center" },
   buttonWrap: { alignSelf: "stretch", marginTop: 18 },
   button: { minHeight: 52, alignItems: "center", justifyContent: "center" },

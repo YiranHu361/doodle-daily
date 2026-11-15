@@ -198,4 +198,26 @@
   adds a fact naming the publisher (`og:site_name`, else the host) so the writer can name it.
 - **`isSafeStory`** is `storyRefusal(text, { sourced: true }) === null`, so paper names and niches
   (`papers:create`) get the same looser rules.
+## Thread 6 (polish and Revyl tests)
+
+- **Card to Reader flight** (`src/components/Flight.tsx`). Native-stack screens cannot share elements, so the
+  flight is a root overlay above the stack: the card measures its cover, the overlay lifts it, the Reader measures
+  its panel-1 picture and the cover springs into it while the Reader fades in behind (stack `fade`, 200 ms). The
+  Reader keeps panel 1's picture hidden and the caption faded until the flight lands. The overlay never takes
+  touches, a flight with no target after 700 ms is dropped, and every flight is cleared after 1.6 s, so the Reader
+  can never be left blank or untappable. Closing from panel 1 flies the picture back to the card it came from.
+  Reduce Motion skips the flight and keeps the plain fade.
+- **Wording.** People see "Create" where the docs say "Commission": the dock button, "Create a comic", status lines
+  ("Creating your comic"), the toast, the CREATED badge, and "Created by a reader" as the Real story source for
+  those comics. Internal names (the `commissions` table, functions, testIDs, Whop metadata `kind`) are unchanged.
+  The stored `sourceName` of those comics is still "Commissioned by a reader"; the app relabels it. The Whop
+  checkout page still shows the sandbox product name "Doodle Daily Commission".
+- **Launch** plays once per app start (`src/components/launch.ts`): grid fade, wordmark tube flicker, Robo drop,
+  dock slide. **Picture arrival** pulses the paper's backlight once when a picture first appears.
+- **Icon and splash** are drawn from Robo's own SVG shapes with resvg (no new dependency in the app).
+- **Revyl tests** live in `.revyl/tests/` in Revyl's YAML format (`revyl test create <name> --from-file …`). This
+  machine has no Revyl CLI, so the flows were run step by step on a Revyl cloud iPhone 16 from Capy rather than
+  through `revyl test run`. The Whop web checkout is hard to drive on the phone (the page scrolls as fields
+  focus), so the paid run filled the same checkout URL in a desktop browser and returned to the app.
+- **Spend at 1:45 pm (Pacific), 2026-11-15:** 85 images used of a 160 cap, 37 script calls, about $6.13.
 

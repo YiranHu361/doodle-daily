@@ -14,7 +14,7 @@ export function BillingSheet({ visible, onClose, testID, children }: { visible: 
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
         <View testID={testID} accessibilityViewIsModal style={[styles.sheet, { maxHeight: height * 0.92, paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.grabber} />
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
             {children}
           </ScrollView>
         </View>
@@ -79,7 +79,7 @@ export function CrownIcon({ size = 34 }: { size?: number }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(7,5,26,0.6)" },
-  sheet: { backgroundColor: colors.surface[1], borderTopWidth: 1.5, borderColor: colors.line.bright, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  sheet: { flexShrink: 1, backgroundColor: colors.surface[1], borderTopWidth: 1.5, borderColor: colors.line.bright, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   grabber: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line.dim, marginTop: 8 },
   body: { padding: 24, paddingTop: 16, gap: 14 },
   header: { flexDirection: "row", alignItems: "center", gap: 12 },
