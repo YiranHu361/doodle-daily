@@ -20,7 +20,7 @@ async function insertComic(t: T, fields: ComicFields = {}, withImages = true) {
       title: "Robo Buys a Cloud",
       realStory: "A company bought a lot of servers. Prices went up.",
       sourceName: "Example News",
-      sourceUrl: "https://example.com/story",
+      sourceUrl: "https://www.npr.org/fixture/story",
       status: "ready",
       order: 0,
       createdAt: now,
@@ -55,7 +55,7 @@ describe("GET /s/<comicId>", () => {
     expect(page.body).toContain('<meta name="twitter:card" content="summary_large_image">');
     expect(page.body).toContain(`href="doodledaily://reader/${id}"`);
     expect(page.body).toContain("Open in Doodle Daily");
-    expect(page.body).toContain('<a href="https://example.com/story"');
+    expect(page.body).toContain('<a href="https://www.npr.org/fixture/story"');
     expect(page.body).toContain(">TECH<");
     expect(page.body).not.toContain("SPONSORED");
     expect(page.body).not.toContain("UNVERIFIED LINK");
@@ -64,7 +64,7 @@ describe("GET /s/<comicId>", () => {
 
   test("model text is escaped", async () => {
     const t = convexTest(schema, modules);
-    const ok = await insertComic(t, { title: `<script>alert("x")</script> & 'friends'`, realStory: "<b>bold</b>", sourceUrl: "javascript:alert(1)" });
+    const ok = await insertComic(t, { title: `<script>alert("x")</script> & 'friends'`, realStory: "<b>bold</b>", sourceUrl: "javascript:alert(1)", kind: "commission", sponsored: true });
     const page = await get(t, `/s/${ok}`);
     expect(page.status).toBe(200);
     expect(page.body).not.toContain("<script>");

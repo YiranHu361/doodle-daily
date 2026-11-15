@@ -3,7 +3,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { pacificDate } from "./lib/dates";
-import { createEdition, fallbackPick, newestEdition, release, replaceTop, settle, WIDE_STORY_WINDOW_MS, writeComic } from "./pipeline";
+import { createEdition, fallbackPick, newestEdition, release, replaceTop, searchHarder, settle, WIDE_STORY_WINDOW_MS, writeComic } from "./pipeline";
 import { getScriptProvider } from "./providers";
 
 export const REVEAL_DELAY_MS = 7000;
@@ -14,7 +14,7 @@ const IMAGES_PER_COMIC = 4;
 
 export function poolSize(): number {
   const n = Number(process.env.FRESH_POOL_SIZE);
-  return Number.isInteger(n) && n >= 0 ? n : 3;
+  return Number.isInteger(n) && n >= 0 ? n : 5;
 }
 
 export const status = internalQuery({
@@ -97,6 +97,7 @@ export const topUp = internalAction({
     }
     const notes: string[] = [];
     let started = 0;
+    let searched = false;
     try {
       const provider = getScriptProvider();
       const date = pacificDate(Date.now());
@@ -107,10 +108,15 @@ export const topUp = internalAction({
           notes.push("image cap reached");
           break;
         }
-        const storyId: Id<"stories"> | null =
+        const best = async (): Promise<Id<"stories"> | null> =>
           (await ctx.runQuery(internal.pipeline.bestUnusedStory, { now: Date.now() })) ??
-          (await ctx.runQuery(internal.pipeline.bestUnusedStory, { now: Date.now(), windowMs: WIDE_STORY_WINDOW_MS })) ??
-          (await fallbackPick(ctx, provider, date));
+          (await ctx.runQuery(internal.pipeline.bestUnusedStory, { now: Date.now(), windowMs: WIDE_STORY_WINDOW_MS }));
+        let storyId: Id<"stories"> | null = (await best()) ?? (await fallbackPick(ctx, provider, date));
+        if (!storyId && !searched) {
+          searched = true;
+          notes.push(...(await searchHarder(ctx)));
+          storyId = await best();
+        }
         if (!storyId) {
           notes.push("no unused story");
           break;

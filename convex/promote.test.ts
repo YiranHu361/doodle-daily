@@ -111,7 +111,7 @@ async function seedIssue(t: T) {
     const editionId = await ctx.db.insert("editions", { date: pacificDate(now), number: 1, status: "published", createdAt: now, publishedAt: now });
     const panels = [0, 1, 2, 3].map(() => ({ scene: "Robo on a hill.", cast: ["Robo"], caption: "Robo waves." }));
     for (const [order, title] of [[0, "The lead"], [1, "The second"], [2, "The third"]] as const) {
-      await ctx.db.insert("comics", { editionId, section: "tech", kind: "news", title, realStory: "One. Two.", sourceName: "X", sourceUrl: "https://example.com", status: "ready", order, createdAt: now, deadline: now + 1e6, panels });
+      await ctx.db.insert("comics", { editionId, section: "tech", kind: "news", title, realStory: "One. Two.", sourceName: "X", sourceUrl: "https://www.npr.org/fixture", status: "ready", order, createdAt: now, deadline: now + 1e6, panels });
     }
   });
 }

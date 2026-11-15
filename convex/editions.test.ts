@@ -1,16 +1,16 @@
 import { convexTest } from "convex-test";
 import { describe, expect, test } from "vitest";
-import { api, internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { modules } from "./test.setup";
+import { modules, seedForTests } from "./test.setup";
 import { addDays, pacificDate } from "./lib/dates";
 import { mockScript } from "./providers/mockScript";
 import { TODAY_STORIES } from "./seedData";
 
 async function seeded(opts: { leaveOneDrawing?: boolean } = {}) {
   const t = convexTest(schema, modules);
-  await t.action(internal.seed.run, { fast: true, ...opts });
+  await seedForTests(t, opts);
   return t;
 }
 
@@ -79,7 +79,7 @@ describe("editions:today", () => {
 
   test("seeding twice keeps one issue per date", async () => {
     const t = await seeded();
-    await t.action(internal.seed.run, { fast: true });
+    await seedForTests(t);
     const list = await t.query(api.editions.list, {});
     expect(list.map((e) => e.number)).toEqual([2, 1]);
   });

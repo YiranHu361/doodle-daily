@@ -1,11 +1,11 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { api, internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { pacificDate } from "./lib/dates";
 import { cleanName, generatedName, QUIZ_MODEL, speedBonus } from "./quiz";
 import schema from "./schema";
-import { modules } from "./test.setup";
+import { modules, seedForTests } from "./test.setup";
 
 const ME = "device-me-0001";
 const FRIEND = "device-friend-01";
@@ -31,7 +31,7 @@ afterEach(() => {
 
 async function setup() {
   const t = convexTest(schema, modules);
-  await t.action(internal.seed.run, { fast: true });
+  await seedForTests(t);
   const today = (await t.query(api.editions.today, {}))!;
   return { t, comics: today.comics.map((c) => c._id as Id<"comics">) };
 }

@@ -62,7 +62,7 @@ describe("draw flow", () => {
   });
 
   test("every refusal has the copy from the design", () => {
-    expect(drawMessage("no_story")).toBe("No fresh stories right now.");
+    expect(drawMessage("no_story")).toBe("Robo is still checking sources. Try again in a minute.");
     expect(drawMessage("spend_cap")).toBe("Robo is out of crayons for today.");
     expect(drawMessage("busy")).toBe("Robo is already drawing one.");
     expect(drawMessage("bad_secret")).toBe("My crayon snapped. Try again.");

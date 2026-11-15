@@ -86,6 +86,7 @@ export default defineSchema({
     itemIds: v.array(v.id("items")),
     sourceName: v.string(),
     sourceUrl: v.string(),
+    originUrl: v.optional(v.string()),
     score: v.number(),
     whyFunny: v.optional(v.string()),
     format: v.optional(v.string()),

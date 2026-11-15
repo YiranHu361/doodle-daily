@@ -48,8 +48,8 @@ async function addItems(t: T) {
           publisher: "example.com",
           title,
           summary: `${title} according to a report. Officials said it went well.`,
-          url: `https://example.com/${n}`,
-          normalizedUrl: `https://example.com/${n}`,
+          url: `https://www.npr.org/fixture/${n}`,
+          normalizedUrl: `https://www.npr.org/fixture/${n}`,
           publishedAt: now - n * 60_000,
           fetchedAt: now,
         });
@@ -310,14 +310,13 @@ describe("pipeline:drawFreshOne", () => {
     expect(await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: "" })).toEqual({ ok: false, reason: "bad_secret" });
   });
 
-  test("no story anywhere draws a Slow news day comic instead of refusing", async () => {
+  test("no sourced story anywhere returns no_story and writes nothing", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 404 })));
     const t = convexTest(schema, modules);
     const res = await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: SECRET });
     vi.unstubAllGlobals();
-    expect(res.ok).toBe(true);
-    await settleAll(t, 10_000);
-    expect((await t.query(api.editions.today, {}))!.comics[0]).toMatchObject({ sourceName: "Doodle Daily newsroom", sourceUrl: "", isNew: true });
+    expect(res).toEqual({ ok: false, reason: "no_story" });
+    expect(await t.run((ctx) => ctx.db.query("comics").collect())).toEqual([]);
     expect(await t.mutation(internal.pipeline.acquireLock, { name: "fresh", holder: "after", ttlMs: 1000 })).toBe(true);
   });
 

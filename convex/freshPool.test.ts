@@ -6,7 +6,6 @@ import schema from "./schema";
 import { modules } from "./test.setup";
 import { REVEAL_DELAY_MS } from "./freshPool";
 import { pacificDate } from "./lib/dates";
-import { SLOW_NEWS_SOURCE } from "./pipeline";
 import { setProvidersForTests } from "./providers";
 
 const SECRET = "test-demo-secret";
@@ -22,7 +21,7 @@ beforeEach(() => {
   process.env.MOCK_IMAGE_DELAY_MS = "0";
   process.env.DEMO_SECRET = SECRET;
   delete process.env.DEMO_MODE;
-  delete process.env.FRESH_POOL_SIZE;
+  process.env.FRESH_POOL_SIZE = "3";
   delete process.env.ANTHROPIC_API_KEY;
   delete process.env.OPENAI_API_KEY;
   delete process.env.DAILY_IMAGE_CAP;
@@ -58,7 +57,7 @@ async function addStories(t: T, headlines = HEADLINES, age = 0) {
         facts: [`${headline}, according to a report.`],
         itemIds: [],
         sourceName: "Example",
-        sourceUrl: `https://example.com/${i}`,
+        sourceUrl: `https://www.npr.org/fixture/${i}`,
         score: 5,
         used: false,
         createdAt: Date.now() - age - i,
@@ -203,7 +202,7 @@ async function seedToday(t: T, comics: Partial<Doc<"comics">>[]): Promise<Id<"co
           title: `Seeded comic ${i}`,
           realStory: "Seeded.",
           sourceName: "Example",
-          sourceUrl: `https://example.com/seeded/${i}`,
+          sourceUrl: `https://www.npr.org/fixture/seeded/${i}`,
           status: "ready",
           order: i,
           createdAt: now,
@@ -277,13 +276,11 @@ describe("Draw a fresh one replaces the top comic", () => {
     expect(await todayIds(t)).toEqual([fresh, seeded[1]]);
   });
 
-  test("the slow-news-day fallback lands in the lead slot too", async () => {
+  test("with nothing sourced the live draw returns no_story and leaves the lead alone", async () => {
     const t = convexTest(schema, modules);
     const seeded = await seedToday(t, [{}, {}]);
-    const fresh = comicIdOf(await draw(t));
-    await settleAll(t, 10_000);
-    expect(await todayIds(t)).toEqual([fresh, seeded[1]]);
-    expect((await t.run((ctx) => ctx.db.get(fresh)))!.sourceName).toBe(SLOW_NEWS_SOURCE);
+    expect(await draw(t)).toEqual({ ok: false, reason: "no_story" });
+    expect(await todayIds(t)).toEqual(seeded);
   });
 
   test("a live draw that fails gives the lead back", async () => {
@@ -297,7 +294,7 @@ describe("Draw a fresh one replaces the top comic", () => {
   });
 });
 
-describe("drawFreshOne never says no_story", () => {
+describe("drawFreshOne searches hard before it says no_story", () => {
   async function landed(t: T, res: Awaited<ReturnType<typeof draw>>) {
     expect(res.ok).toBe(true);
     await settleAll(t, 10_000);
@@ -308,24 +305,38 @@ describe("drawFreshOne never says no_story", () => {
     const t = convexTest(schema, modules);
     await addStories(t, ["Bank opens branch on a train"], 3 * DAY_MS);
     const comic = await landed(t, await draw(t));
-    expect(comic.sourceUrl).toBe("https://example.com/0");
-    expect(fetched).toEqual([]);
+    expect(comic.sourceUrl).toBe("https://www.npr.org/fixture/0");
+    expect(fetched).toEqual(["https://www.npr.org/fixture/0"]);
   });
 
   test("then runs a fresh ingest and retries once", async () => {
     const t = convexTest(schema, modules);
     await addStories(t, ["Bank opens branch on a train"], 8 * DAY_MS);
     feeds["https://www.techmeme.com/feed.xml"] =
-      `<rss><channel><item><title>Smart fridge orders too much cheese</title><link>https://example.org/fridge</link><description>The fridge ordered forty wheels of cheese, the company said.</description><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`;
+      `<rss><channel><item><title>Smart fridge orders too much cheese</title><link>https://www.npr.org/fixture-org/fridge</link><description>The fridge ordered forty wheels of cheese, the company said.</description><pubDate>${new Date().toUTCString()}</pubDate></item></channel></rss>`;
     const comic = await landed(t, await draw(t));
     expect(fetched).toContain("https://www.techmeme.com/feed.xml");
-    expect(comic.sourceUrl).toBe("https://example.org/fridge");
+    expect(comic.sourceUrl).toBe("https://www.npr.org/fixture-org/fridge");
   });
 
-  test("last resort is a Slow news day comic with no source link", async () => {
+  test("an empty pool with nothing sourced returns no_story and never writes an invented comic", async () => {
     const t = convexTest(schema, modules);
-    const comic = await landed(t, await draw(t));
+    await t.run((ctx) =>
+      ctx.db.insert("stories", {
+        section: "culture",
+        kind: "news",
+        headline: "Town choir adds a kazoo section",
+        facts: ["A sample choir added kazoos."],
+        itemIds: [],
+        sourceName: "Doodle Daily sample desk",
+        sourceUrl: "https://example.com/sample/kazoo",
+        score: 9,
+        used: false,
+        createdAt: Date.now(),
+      }),
+    );
+    expect(await draw(t)).toEqual({ ok: false, reason: "no_story" });
     expect(fetched.length).toBeGreaterThan(0);
-    expect(comic).toMatchObject({ sourceName: SLOW_NEWS_SOURCE, sourceUrl: "", status: "ready", section: "culture" });
+    expect(await t.run((ctx) => ctx.db.query("comics").collect())).toEqual([]);
   });
 });

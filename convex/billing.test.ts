@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { modules } from "./test.setup";
+import { modules, seedForTests } from "./test.setup";
 import { addDays, pacificDate } from "./lib/dates";
 import { signWebhook } from "./lib/webhook";
 import { imageCap } from "./pipeline";
@@ -439,7 +439,7 @@ describe("free draws and freezes", () => {
 
 describe("locked archive", () => {
   async function withOldIssue(t: T) {
-    await t.action(internal.seed.run, { fast: true });
+    await seedForTests(t);
     const old = addDays(pacificDate(Date.now()), -5);
     await t.run(async (ctx) => {
       const source = (await ctx.db.query("comics").first())!;

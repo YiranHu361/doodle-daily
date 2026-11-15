@@ -6,6 +6,7 @@ import { addDays, pacificDate } from "./lib/dates";
 import { checkDeviceId } from "./lib/device";
 import { isVisible } from "./lib/dto";
 import { isSafeStory } from "./lib/filter";
+import { isRealSource } from "./lib/urls";
 import { getScriptProvider } from "./providers";
 import { callClaude } from "./providers/anthropic";
 
@@ -78,7 +79,9 @@ export function checkQuiz(raw: unknown): { question: string; options: string[]; 
 }
 
 function canHaveQuiz(comic: Doc<"comics"> | null): comic is Doc<"comics"> {
-  return !!comic && comic.status === "ready" && comic.hidden !== true && comic.owner === undefined && comic.panels.length === 4;
+  return (
+    !!comic && comic.status === "ready" && comic.hidden !== true && comic.owner === undefined && comic.panels.length === 4 && isRealSource(comic.sourceUrl)
+  );
 }
 
 async function quizFor(ctx: QueryCtx, comicId: Id<"comics">) {

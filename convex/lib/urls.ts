@@ -28,3 +28,23 @@ export function normaliseUrl(raw: string): string | null {
   const port = url.port && url.port !== "80" && url.port !== "443" ? ":" + url.port : "";
   return `https://${host}${port}${path}${query}`;
 }
+
+const FAKE_HOSTS = ["example.com", "example.org", "example.net", "localhost"];
+const FAKE_SUFFIXES = [".example", ".test", ".invalid", ".localhost", ".local", ".internal"];
+
+export function isRealSource(raw: string | undefined | null): boolean {
+  if (!raw || !raw.trim()) return false;
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  if (!/^[a-z0-9.-]+$/.test(host) || !host.includes(".")) return false;
+  if (/^[\d.]+$/.test(host)) return false;
+  if (!/\.[a-z]{2,}$/.test(host)) return false;
+  if (FAKE_HOSTS.some((h) => host === h || host.endsWith("." + h))) return false;
+  return !FAKE_SUFFIXES.some((s) => host.endsWith(s));
+}
