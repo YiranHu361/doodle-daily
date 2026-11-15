@@ -8,6 +8,8 @@ const PUBLIC_ALLOW_LIST = [
   "pipeline:drawFreshOne",
   "reactions:counts",
   "reactions:toggle",
+  "voice:ensure",
+  "voice:forComic",
 ];
 
 type Registered = { isPublic?: boolean; isInternal?: boolean; isQuery?: boolean; isMutation?: boolean; isAction?: boolean };
