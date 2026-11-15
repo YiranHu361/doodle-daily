@@ -111,3 +111,39 @@
   setup, which would change `package.json` that other threads share.
 - **Image memory cap.** expo-image has no API to cap its memory cache; pictures use
   `cachePolicy="memory-disk"` with downscaling, so each is fetched once.
+
+## Thread 5 (Whop payments)
+
+- **Plain `fetch`, no SDK.** `convex/lib/whop.ts` calls `https://sandbox-api.whop.com/api/v1` and
+  `convex/lib/webhook.ts` verifies Standard Webhooks signatures with WebCrypto (key = UTF-8 bytes of the
+  whole `ws_…` secret, 5 minute tolerance, constant-time compare). Every Whop call goes through
+  `whopConfig()`, which refuses unless `WHOP_ENVIRONMENT=sandbox`.
+- **Webhook flow.** `POST /whop` verifies the raw body, dedupes on `webhook-id` in `webhookEvents`,
+  answers 200 and schedules `billing:handleEvent`. Each handled event writes a one-line `note`
+  (`billing:recentEvents` lists them). A live checkout sends both `membership.activated` (with the
+  checkout metadata) and `payment.succeeded`; either one writes the entitlement.
+- **Ending Plus.** Whop's live spec (2026-11-14-1) lists `membership.activated`, `membership.updated` and
+  `membership.trial_ending_soon` but no `membership.deactivated`/`went_invalid`. The handler ends Plus on
+  those if they ever arrive, on `payment.failed`, and on any `membership.*` whose status is not
+  active/trialing; a lapsed `current_period_end` also ends Plus without any event.
+- **`billing:status`** returns `{ plus, plusUntil, freeDrawsLeftToday, freezesLeftThisWeek, freeDaysEarned }`;
+  `freeDrawsLeftToday` is `null` (unlimited) for Plus.
+- **Free draws.** `pipeline:drawFreshOne` claims the day's free draw (Pacific date) before the lock and gives
+  it back if no comic starts, so busy/no-story/cap answers do not use it up. The existing "second press"
+  pipeline test now runs as a Plus reader.
+- **Locked archive.** `editions:list`/`byDate` take an optional `deviceId`; without Plus, issues older
+  than yesterday come back with `locked: true` (`byDate` returns the issue header with no comics).
+  A missing `deviceId` counts as a free reader.
+- **Combo pays for Plus.** `billing:claimComboReward` pays one day per milestone (the combo floored to a
+  multiple of 7) per membership, at most once per 6 days, and stores the claim before calling
+  `POST /memberships/{id}/extend` (a failed call releases the claim). The combo itself lives on the
+  device, so the server trusts `comboDays`; the milestone and 6-day rules bound what a forged value buys.
+- **Combo freeze.** `billing:useFreeze` records one forgiven day per week (Sunday-start) for Plus;
+  `ComboFreeze` on Today applies it to the local streak when exactly yesterday was missed.
+- **Refunds.** `POST /payments/{id}/refund` works in the sandbox and answers with the Payment
+  (`substatus: "refunded"`), not a Refund object, so `commissions.refundId` holds the payment id.
+  If the call fails the commission keeps `refundOwed: true`.
+- **Shared deployment.** Threads deploy to the same `resilient-ostrich-674`; `npx convex dev --once`
+  replaces every function and the schema, so deploy a merge of the open branches (the voice thread's
+  schema adds fields to `comics`).
+- **Waitlist dropped.** "Start your own paper" replaces the pitch screen and `waitlist:join`.
