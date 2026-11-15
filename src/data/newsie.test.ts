@@ -6,6 +6,10 @@ describe("newsieSmsUrl", () => {
     expect(newsieSmsUrl("+1 (555) 010-0100", "Hi Newsie! K-7QF2MD")).toBe("sms:+15550100100&body=Hi%20Newsie!%20K-7QF2MD");
   });
 
+  test("Today's row opens Messages to Newsie's shared number with the join code", () => {
+    expect(newsieSmsUrl()).toBe("sms:+17796251378&body=K-VHD7EF");
+  });
+
   test("hides the row until a number is configured", () => {
     expect(newsieSmsUrl("", "K-7QF2MD")).toBeNull();
     expect(newsieSmsUrl("call me", "")).toBeNull();

@@ -1,5 +1,24 @@
 # Doodle Daily
 
+## Keiki
+
+Text Newsie a news link over iMessage and get a four-panel comic back.
+
+- **Number:** +1 (779) 625-1378 (Keiki's shared iMessage number)
+- **Join code:** `K-VHD7EF`
+
+Try it from an iPhone:
+
+1. Open Messages and start a new message to +1 (779) 625-1378, or tap **Text Newsie a link** on Today,
+   which opens Messages with the code filled in.
+2. Send `K-VHD7EF` once. This joins you to Newsie on the shared number; you only do it the first time.
+3. Send an article link, or a few words like "the Fed meeting". Newsie answers with a short "On it".
+4. In about a minute, Newsie sends the comic: four pictures with their captions, then the title, the real story,
+   the source link and a Doodle Daily link. Each number gets two texted comics a day.
+5. Text "today" for today's lead comic, or "is my comic ready?" if nothing has arrived yet.
+
+The shared number can't text you first, so you have to send the join code before anything else works.
+
 The news, drawn in crayon. Every morning Doodle Daily turns real stories in tech,
 money, culture and memes into 4-panel comics starring a cast of five characters.
 Each comic ends with the real story in two plain sentences and a link to the source.

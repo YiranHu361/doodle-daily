@@ -263,3 +263,7 @@
   `get_comic_status` with no or an unknown id now answers the sender's latest comic of the day.
 - **Pictures.** On the API gateway Newsie fell back to the four captions as text, with no `files`. `send_file`
   on the shared iMessage number has not been tried yet.
+- **Shared iMessage number (2026-11-15).** Newsie is on +1 (779) 625-1378, join code `K-VHD7EF` (from the
+  dashboard; REST has no shared-line read). `scripts/deploy-newsie.mjs` was re-run (`created: false`) to make sure
+  `features.sandbox` is on; REST cannot read features back. A notice to a phone with no conversation answers
+  `404 {"error":"This agent has no conversation with that identity"}`, which `keiki:notify` records as `noticeError`.
