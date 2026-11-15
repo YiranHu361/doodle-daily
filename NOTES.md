@@ -278,3 +278,21 @@
   dashboard; REST has no shared-line read). `scripts/deploy-newsie.mjs` was re-run (`created: false`) to make sure
   `features.sandbox` is on; REST cannot read features back. A notice to a phone with no conversation answers
   `404 {"error":"This agent has no conversation with that identity"}`, which `keiki:notify` records as `noticeError`.
+
+## Thread 11 (story links)
+
+- **Route.** `GET /s/<comicId>` (`pathPrefix: "/s/"` in `convex/http.ts`) renders `convex/storyPage.ts`: server-side HTML, no
+  script, every model string escaped, `Cache-Control: public, max-age=60`. Fonts load from Google Fonts with system
+  fallbacks. The source link is only rendered for http(s) URLs.
+- **404 rule.** Anything but a `ready`, visible (not failed, hidden or pooled), four-picture comic with no `owner` gives the
+  same 404 page. Commissions are 404 unless sponsored (Promote comics are ownerless commissions), and so are paper samples. `replacedAt` is not checked, so
+  replaced comics still open. Sponsored comics get a SPONSORED tag.
+- **Deep link.** `doodledaily://reader/<comicId>` already routed to `app/reader/[comicId].tsx`, but the Reader only looked in
+  today's issue. It now falls back to the new public query `storyPage:comic` (same visibility as the issue queries, owned
+  comics only for their device), so a link to an older comic opens too.
+- **Sharing.** `src/share/link.ts` builds the link from `EXPO_PUBLIC_CONVEX_URL` (`.convex.cloud` to `.convex.site`). Share
+  now uses React Native's `Share` with `"<title>" <link>`; iOS also attaches the picture card, Android shares text only
+  (its share sheet takes one or the other). "Copy link" uses `expo-clipboard`, a new native module, so the next build
+  needs a fresh development build.
+- **Codegen.** `convex/_generated/api.d.ts` was edited by hand to add `storyPage`, because `npx convex codegen` pushes to
+  the shared deployment.

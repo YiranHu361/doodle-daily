@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
@@ -27,10 +28,11 @@ import { CutBox, CutButton } from "../../src/components/shapes";
 import { SkeletonList } from "../../src/components/Skeleton";
 import { EmptyState } from "../../src/components/States";
 import { useToast } from "../../src/components/Toast";
-import { PrimaryButton, ReadStamp, SectionTag } from "../../src/components/ui";
-import { useIssue, useReactions } from "../../src/data/hooks";
+import { PrimaryButton, ReadStamp, SecondaryButton, SectionTag } from "../../src/components/ui";
+import { useComicById, useIssue, useReactions } from "../../src/data/hooks";
 import { REAL_STORY_PAGE, shouldMarkRead } from "../../src/data/readTracker";
 import type { Comic, Panel } from "../../src/data/types";
+import { storyLink } from "../../src/share/link";
 import { ShareHost, useShare } from "../../src/share/useShare";
 import { isRead, markComicRead, notifyBusy, notifyReaderClosed, useCombo } from "../../src/streak";
 import { colors, cut, sectionColor, space, springs, type } from "../../src/theme";
@@ -109,7 +111,23 @@ function PanelPage({
   );
 }
 
-function RealStoryPage({ comic, width, read, onJump, onOpenSource }: { comic: Comic; width: number; read: boolean; onJump: (page: number) => void; onOpenSource: () => void }) {
+function RealStoryPage({
+  comic,
+  width,
+  read,
+  onJump,
+  onOpenSource,
+  onShare,
+  onCopyLink,
+}: {
+  comic: Comic;
+  width: number;
+  read: boolean;
+  onJump: (page: number) => void;
+  onOpenSource: () => void;
+  onShare: () => void;
+  onCopyLink: () => void;
+}) {
   const color = sectionColor[comic.section];
   const thumb = Math.floor((width - space.margin * 2 - 32 - 3 * 10) / 4);
   return (
@@ -160,6 +178,10 @@ function RealStoryPage({ comic, width, read, onJump, onOpenSource }: { comic: Co
             onPress={onOpenSource}
           />
         ) : null}
+        <View style={styles.linkRow}>
+          <SecondaryButton testID="shareLinkButton" label={copy.share} icon={<ShareIcon />} onPress={onShare} style={styles.flex} />
+          <SecondaryButton testID="copyLinkButton" label={copy.copyLink} onPress={onCopyLink} style={styles.flex} />
+        </View>
         {read ? <ReadStamp /> : null}
       </CutBox>
     </ScrollView>
@@ -186,7 +208,15 @@ function ReaderView({ comic }: { comic: Comic }) {
   const onReactionError = useCallback(() => toast.show(copy.reactionFailed), [toast]);
   const reactions = useReactions(comic._id, onReactionError);
   const onShareError = useCallback(() => toast.show(copy.shareFailed), [toast]);
-  const share = useShare(onShareError);
+  const share = useShare(comic, onShareError);
+  const copyLink = useCallback(async () => {
+    try {
+      await Clipboard.setStringAsync(storyLink(comic._id));
+      toast.show(copy.linkCopied);
+    } catch {
+      toast.show(copy.copyFailed);
+    }
+  }, [comic._id, toast]);
 
   useEffect(() => {
     enter.set(withTiming(1, { duration: reduce ? 200 : 320 }));
@@ -300,7 +330,15 @@ function ReaderView({ comic }: { comic: Comic }) {
                 {comic.panels.map((p, i) => (
                   <PanelPage key={i} comicId={comic._id} panel={p} index={i} width={width} height={pageHeight} color={color} scrollX={scrollX} onPicture={i === 0 ? setFirstPicture : undefined} />
                 ))}
-                <RealStoryPage comic={comic} width={width} read={read} onJump={jump} onOpenSource={openSource} />
+                <RealStoryPage
+                  comic={comic}
+                  width={width}
+                  read={read}
+                  onJump={jump}
+                  onOpenSource={openSource}
+                  onShare={share.share}
+                  onCopyLink={() => void copyLink()}
+                />
               </Animated.ScrollView>
             ) : null}
           </View>
@@ -331,7 +369,8 @@ export default function Reader() {
   const found = issue.kind === "ready" ? issue.data.comics.find((c) => c._id === params.comicId) : undefined;
   const [kept, setKept] = useState(found);
   if (found && found !== kept) setKept(found);
-  const comic = found ?? kept;
+  const byId = useComicById(found || kept || issue.kind === "loading" ? null : params.comicId);
+  const comic = found ?? kept ?? byId;
   if (comic) return <ReaderView key={comic._id} comic={comic} />;
   return (
     <View style={styles.flex}>
@@ -340,7 +379,7 @@ export default function Reader() {
         <CutButton testID="closeReader" accessibilityLabel="Close" onPress={() => router.back()} cut={cut.chip} fill={colors.surface[2]} stroke={colors.line.dim} boxStyle={styles.close}>
           <CloseIcon />
         </CutButton>
-        {issue.kind === "loading" ? <SkeletonList /> : <EmptyState title={copy.emptySection} />}
+        {issue.kind === "loading" || comic === undefined ? <SkeletonList /> : <EmptyState title={copy.emptySection} />}
       </SafeAreaView>
     </View>
   );
@@ -369,5 +408,6 @@ const styles = StyleSheet.create({
   sourceName: { ...type.button, color: colors.text.hi },
   bottomBar: { flexDirection: "row", gap: 8, paddingHorizontal: space.margin, paddingTop: 8, paddingBottom: 8 },
   shareBox: { width: 52, minHeight: 48 },
+  linkRow: { flexDirection: "row", gap: 10 },
   hidden: { opacity: 0 },
 });
