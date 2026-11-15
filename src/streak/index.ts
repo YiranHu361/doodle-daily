@@ -1,4 +1,13 @@
-import { useSyncExternalStore } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useEffect, useSyncExternalStore } from "react";
+import { AppState } from "react-native";
+import { resetDeviceId } from "../data/deviceId";
+import { resetIntro } from "../intro/state";
+import { systemClock } from "./dates";
+import type { Banner, Celebration, DayCell, Ended, MonthGrid } from "./model";
+import { createStreakStore } from "./store";
+
+export type { Banner, Celebration, DayCell, Ended, MonthGrid };
 
 export type Combo = {
   current: number;
@@ -6,28 +15,76 @@ export type Combo = {
   todayCleared: boolean;
   atRisk: boolean;
   comicsRead: number;
+  ready: boolean;
+  today: string;
+  week: DayCell[];
+  month: MonthGrid;
+  ended: Ended | null;
+  banner: Banner | null;
 };
 
-const read = new Set<string>();
-const listeners = new Set<() => void>();
-let snapshot: Combo = { current: 0, best: 0, todayCleared: false, atRisk: false, comicsRead: 0 };
+const REFRESH_MS = 30_000;
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+export const streakStore = createStreakStore({
+  storage: AsyncStorage,
+  clock: systemClock,
+  timers: { setTimeout: (fn, ms) => setTimeout(fn, ms), clearTimeout: (h) => clearTimeout(h as ReturnType<typeof setTimeout>) },
+});
+
+let watchers = 0;
+let stopWatching: (() => void) | null = null;
+
+function watch() {
+  watchers += 1;
+  if (watchers === 1) {
+    const interval = setInterval(() => streakStore.refresh(), REFRESH_MS);
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") streakStore.refresh();
+    });
+    stopWatching = () => {
+      clearInterval(interval);
+      sub.remove();
+    };
+  }
+  return () => {
+    watchers -= 1;
+    if (watchers === 0) {
+      stopWatching?.();
+      stopWatching = null;
+    }
+  };
 }
 
 export function useCombo(): Combo {
-  return useSyncExternalStore(subscribe, () => snapshot);
+  useEffect(watch, []);
+  return useSyncExternalStore(streakStore.subscribe, streakStore.getSnapshot);
+}
+
+export function useCelebration(): Celebration | null {
+  useEffect(watch, []);
+  return useSyncExternalStore(streakStore.subscribe, streakStore.getCelebration);
 }
 
 export function markComicRead(comicId: string): void {
-  if (read.has(comicId)) return;
-  read.add(comicId);
-  snapshot = { current: 1, best: Math.max(1, snapshot.best), todayCleared: true, atRisk: false, comicsRead: read.size };
-  listeners.forEach((l) => l());
+  streakStore.markComicRead(comicId);
 }
 
 export function isRead(comicId: string): boolean {
-  return read.has(comicId);
+  return streakStore.isRead(comicId);
+}
+
+export function notifyReaderClosed(): void {
+  streakStore.notifyReaderClosed();
+}
+
+export function notifyBusy(isBusy: boolean): void {
+  streakStore.notifyBusy(isBusy);
+}
+
+export function applyFreeze(day: string): void {
+  streakStore.applyFreeze(day);
+}
+
+export async function resetLocalState(): Promise<void> {
+  await Promise.all([streakStore.reset(), resetIntro(), resetDeviceId()]);
 }
