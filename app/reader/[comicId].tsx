@@ -34,6 +34,7 @@ import { ShareHost, useShare } from "../../src/share/useShare";
 import { isRead, markComicRead, notifyBusy, notifyReaderClosed, useCombo } from "../../src/streak";
 import { colors, cut, sectionColor, space, springs, type } from "../../src/theme";
 import { copy } from "../../src/theme/copy";
+import { SpeakerButton, useNarration, useVoiceSetting } from "../../src/voice";
 
 const PAGES = 5;
 
@@ -129,6 +130,7 @@ function ReaderView({ comic }: { comic: Comic }) {
   const color = sectionColor[comic.section];
   const [page, setPage] = useState(0);
   const [seen, setSeen] = useState<Set<number>>(() => new Set([0]));
+  useNarration(comic._id, page, useVoiceSetting().on);
   const [pageHeight, setPageHeight] = useState(0);
   const scrollRef = useRef<Animated.ScrollView>(null);
   const scrollX = useSharedValue(0);
@@ -220,6 +222,7 @@ function ReaderView({ comic }: { comic: Comic }) {
                   <CloseIcon />
                 </CutButton>
                 <ProgressPips page={page} seen={seen} color={color} />
+                <SpeakerButton color={color} />
                 <View style={styles.counter} accessible accessibilityLabel={page < REAL_STORY_PAGE ? `${page + 1} of 4` : "The real story"}>
                   {page < REAL_STORY_PAGE ? <Text style={styles.counterText}>{page + 1}/4</Text> : <CompassIcon color={color} />}
                 </View>
