@@ -1,0 +1,20 @@
+export const copy = {
+  dayCleared: "DAY CLEARED",
+  dayCombo: "day combo",
+  keepReading: "Keep reading",
+  bubble: (n: number) => (n <= 1 ? "That's day one. Come back tomorrow and it becomes a combo." : `${n} days. The crayons are warm.`),
+  sheetTitle: "Your combo",
+  highScore: "High score",
+  comicsRead: "Comics read",
+  thisWeek: "This week",
+  howItWorks: "How it works",
+  howLines: [
+    "Finish one comic, all four panels and the real story, to clear the day.",
+    "Clear days in a row and the combo grows.",
+    "Miss a day and it starts over. Your high score stays.",
+  ],
+  statusCleared: (n: number) => `Today's cleared. Come back tomorrow for ${n + 1}.`,
+  statusOpen: "Read one comic to clear today.",
+  atRisk: (n: number) => `Your ${n}-day combo ends at midnight. One comic saves it.`,
+  ended: (n: number, best: number) => `Combo over at ${n}. High score ${best}. New game?`,
+} as const;
