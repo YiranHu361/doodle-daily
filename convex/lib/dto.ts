@@ -59,7 +59,7 @@ export type EditionSummaryDTO = Infer<typeof editionSummaryDTO>;
 export const MAX_EDITION_COMICS = 64;
 
 export function isVisible(comic: Doc<"comics">): boolean {
-  return comic.status !== "failed" && comic.hidden !== true && comic.panels.length === 4;
+  return comic.status !== "failed" && comic.hidden !== true && comic.pooled !== true && comic.panels.length === 4;
 }
 
 export function isCreatedFor(comic: Doc<"comics">, viewer: string | undefined): boolean {

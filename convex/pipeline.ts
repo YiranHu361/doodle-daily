@@ -91,7 +91,7 @@ async function acquire(ctx: MutationCtx, name: string, holder: string, ttlMs: nu
   return true;
 }
 
-async function release(ctx: MutationCtx, name: string, holder: string): Promise<boolean> {
+export async function release(ctx: MutationCtx, name: string, holder: string): Promise<boolean> {
   const row = await ctx.db
     .query("locks")
     .withIndex("by_name", (q) => q.eq("name", name))
@@ -207,11 +207,11 @@ export const finishRun = internalMutation({
 
 // ---------- editions and settling ----------
 
-async function newestEdition(ctx: MutationCtx): Promise<Doc<"editions"> | null> {
+export async function newestEdition(ctx: MutationCtx): Promise<Doc<"editions"> | null> {
   return await ctx.db.query("editions").withIndex("by_date").order("desc").first();
 }
 
-async function createEdition(ctx: MutationCtx, date: string): Promise<Doc<"editions">> {
+export async function createEdition(ctx: MutationCtx, date: string): Promise<Doc<"editions">> {
   const newest = await ctx.db.query("editions").withIndex("by_number").order("desc").first();
   const id = await ctx.db.insert("editions", { date, number: (newest?.number ?? 0) + 1, status: "building", createdAt: Date.now() });
   return (await ctx.db.get(id))!;
@@ -246,14 +246,15 @@ export async function deleteComic(ctx: MutationCtx, comic: Doc<"comics">, releas
 export async function settle(ctx: MutationCtx, editionId: Id<"editions">): Promise<"building" | "published" | "removed" | "missing"> {
   const edition = await ctx.db.get(editionId);
   if (!edition) return "missing";
-  const comics = await editionComics(ctx, editionId);
+  const all = await editionComics(ctx, editionId);
+  const comics = all.filter((c) => c.pooled !== true);
   const busy = comics.some((c) => c.status === "scripted" || c.status === "drawing");
   if (busy || (await isHeld(ctx, `build:${edition.date}`))) {
     if (edition.status !== "building") await ctx.db.patch(editionId, { status: "building" });
     return "building";
   }
   const visible = comics.filter((c) => c.status === "ready" && c.hidden !== true);
-  if (visible.length === 0 && comics.every((c) => c.status === "failed")) {
+  if (visible.length === 0 && comics.every((c) => c.status === "failed") && all.length === comics.length) {
     for (const c of comics) await deleteComic(ctx, c, true);
     await ctx.db.delete(editionId);
     return "removed";
@@ -321,9 +322,9 @@ export const claimStory = internalMutation({
 });
 
 export const bestUnusedStory = internalQuery({
-  args: { now: v.number() },
+  args: { now: v.number(), windowMs: v.optional(v.number()) },
   returns: v.union(v.id("stories"), v.null()),
-  handler: async (ctx, { now }) => {
+  handler: async (ctx, { now, windowMs }) => {
     const newest = await ctx.db.query("editions").withIndex("by_date").order("desc").first();
     const inPaper: string[] = [];
     if (newest) {
@@ -336,9 +337,14 @@ export const bestUnusedStory = internalQuery({
         inPaper.push(story?.headline ?? c.title);
       }
     }
+    const pooled = await ctx.db
+      .query("comics")
+      .withIndex("by_pooled", (q) => q.eq("pooled", true))
+      .take(64);
+    for (const c of pooled) inPaper.push(c.title);
     const fresh = await ctx.db
       .query("stories")
-      .withIndex("by_used_createdAt", (q) => q.eq("used", false).gte("createdAt", now - STORY_WINDOW_MS))
+      .withIndex("by_used_createdAt", (q) => q.eq("used", false).gte("createdAt", now - (windowMs ?? STORY_WINDOW_MS)))
       .order("desc")
       .take(100);
     const best = fresh
@@ -510,11 +516,11 @@ export async function writeValidScript(ctx: ActionCtx, provider: ScriptProvider,
 
 type WriteOutcome = { ok: true; comicId: Id<"comics"> } | { ok: false; reason: "taken" | "bad_script" | "spend_cap" | "no_edition" };
 
-async function writeComic(
+export async function writeComic(
   ctx: ActionCtx,
   provider: ScriptProvider,
   storyId: Id<"stories">,
-  target: { editionId?: Id<"editions">; fresh?: boolean; lockToken?: string },
+  target: { editionId?: Id<"editions">; fresh?: boolean; pooled?: boolean; lockToken?: string },
 ): Promise<WriteOutcome & { detail?: string }> {
   const claimed = await ctx.runMutation(internal.pipeline.claimStory, { storyId });
   if (!claimed) return { ok: false, reason: "taken" };
@@ -531,13 +537,14 @@ export const startComic = internalMutation({
     script: scriptValidator,
     editionId: v.optional(v.id("editions")),
     fresh: v.optional(v.boolean()),
+    pooled: v.optional(v.boolean()),
     lockToken: v.optional(v.string()),
   },
   returns: v.union(
     v.object({ ok: v.literal(true), comicId: v.id("comics") }),
     v.object({ ok: v.literal(false), reason: v.union(v.literal("spend_cap"), v.literal("no_edition"), v.literal("taken"), v.literal("bad_script")) }),
   ),
-  handler: async (ctx, { storyId, script, editionId, fresh, lockToken }) => {
+  handler: async (ctx, { storyId, script, editionId, fresh, pooled, lockToken }) => {
     const story = await ctx.db.get(storyId);
     if (!story) return { ok: false as const, reason: "taken" as const };
     const now = Date.now();
@@ -567,7 +574,8 @@ export const startComic = internalMutation({
       sourceName: story.sourceName,
       sourceUrl: story.sourceUrl,
       status: "drawing",
-      fresh: fresh || undefined,
+      fresh: fresh || pooled || undefined,
+      pooled: pooled || undefined,
       lockToken,
       order,
       createdAt: now,
@@ -576,7 +584,7 @@ export const startComic = internalMutation({
       owner: story.owner,
       unverified: story.unverified || undefined,
     });
-    if (edition.status !== "building") await ctx.db.patch(edition._id, { status: "building" });
+    if (!pooled && edition.status !== "building") await ctx.db.patch(edition._id, { status: "building" });
     for (let index = 0; index < 4; index++) await ctx.scheduler.runAfter(0, internal.pipeline.drawPanel, { comicId, index, attempt: 1 });
     await ctx.scheduler.runAfter(COMIC_DEADLINE_MS, internal.pipeline.checkDeadline, { comicId });
     return { ok: true as const, comicId };
@@ -868,7 +876,7 @@ const freshResult = v.union(
 );
 type FreshResult = typeof freshResult.type;
 
-async function fallbackPick(ctx: ActionCtx, provider: ScriptProvider, date: string): Promise<Id<"stories"> | null> {
+export async function fallbackPick(ctx: ActionCtx, provider: ScriptProvider, date: string): Promise<Id<"stories"> | null> {
   for (const sectionName of ["tech", "money", "culture"] as const) {
     const picked = await pickNews(ctx, provider, sectionName, 1, [], date);
     if (picked.stories.length === 0) continue;
@@ -878,6 +886,69 @@ async function fallbackPick(ctx: ActionCtx, provider: ScriptProvider, date: stri
   return null;
 }
 
+export const WIDE_STORY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+export const SLOW_NEWS_SOURCE = "Doodle Daily newsroom";
+
+export function demoMode(): boolean {
+  return process.env.DEMO_MODE === "1";
+}
+
+const SLOW_NEWS_STORY: StoryInput = {
+  section: "culture",
+  kind: "news",
+  headline: "Slow news day in the newsroom",
+  facts: [
+    "It is a slow news day at the Doodle Daily newsroom.",
+    "Boss Blob, Coin, Robo, Newsie and The Crowd wait around the newsroom for a story to come in.",
+    "This strip is about the cast only and makes no claims about real events, people or companies.",
+  ],
+  itemIds: [],
+  sourceName: SLOW_NEWS_SOURCE,
+  sourceUrl: "",
+  score: 0,
+};
+
+const SLOW_NEWS_SCRIPT: Script = {
+  title: "Slow news day",
+  realStory: "Nothing new came in to the newsroom this time, so the cast waited for the next story.",
+  panels: [
+    { scene: "Newsie sits at a messy newsroom desk, staring at a silent telephone.", cast: ["Newsie"], caption: "The newsroom phone has not rung all morning." },
+    { scene: "Robo taps an empty screen while Boss Blob paces past the desks.", cast: ["Robo", "Boss Blob"], caption: "Robo refreshes the feed for the hundredth time." },
+    { scene: "Coin flips itself on a desk while The Crowd peeks in at the door.", cast: ["Coin", "The Crowd"], caption: "Coin suggests flipping for who writes the next story." },
+    { scene: "Newsie, Robo and Boss Blob share a box of crayons around one desk.", cast: ["Newsie", "Robo", "Boss Blob"], caption: "Slow news day. Robo draws the team instead." },
+  ],
+};
+
+type LiveOutcome = { ok: true; comicId: Id<"comics"> } | { ok: false; reason: "spend_cap" | "no_story" };
+
+export async function drawLive(ctx: ActionCtx, provider: ScriptProvider, date: string, lockToken: string): Promise<LiveOutcome> {
+  const target = { fresh: true, lockToken };
+  const recent = async () => await ctx.runQuery(internal.pipeline.bestUnusedStory, { now: Date.now() });
+  let ingested = false;
+  for (let tries = 0; tries < 3; tries++) {
+    let storyId =
+      (await recent()) ??
+      (tries === 0 ? await fallbackPick(ctx, provider, date) : null) ??
+      (await ctx.runQuery(internal.pipeline.bestUnusedStory, { now: Date.now(), windowMs: WIDE_STORY_WINDOW_MS }));
+    if (!storyId && !ingested) {
+      ingested = true;
+      await ingestAll(ctx).catch(() => null);
+      storyId = (await recent()) ?? (await fallbackPick(ctx, provider, date));
+    }
+    if (!storyId) break;
+    const outcome = await writeComic(ctx, provider, storyId, target);
+    if (outcome.ok) return outcome;
+    if (outcome.reason === "spend_cap") return { ok: false, reason: "spend_cap" };
+  }
+  const [storyId] = await ctx.runMutation(internal.pipeline.saveStories, { stories: [SLOW_NEWS_STORY] });
+  const written = await writeComic(ctx, provider, storyId, target);
+  if (written.ok) return written;
+  if (written.reason === "spend_cap") return { ok: false, reason: "spend_cap" };
+  const canned = await ctx.runMutation(internal.pipeline.startComic, { storyId, script: SLOW_NEWS_SCRIPT, ...target });
+  if (canned.ok) return canned;
+  return { ok: false, reason: canned.reason === "spend_cap" ? "spend_cap" : "no_story" };
+}
+
 export const drawFreshOne = action({
   args: { deviceId: v.string(), secret: v.string() },
   returns: freshResult,
@@ -885,33 +956,34 @@ export const drawFreshOne = action({
     const expected = process.env.DEMO_SECRET ?? "";
     if (!expected || !constantTimeEqual(secret, expected)) return { ok: false, reason: "bad_secret" };
     if (!DEVICE_ID.test(deviceId)) throw new ConvexError("bad_device_id");
-    const tier = await ctx.runMutation(internal.billing.claimFreeDraw, { deviceId });
+    const demo = demoMode();
+    const tier = demo ? "demo" : await ctx.runMutation(internal.billing.claimFreeDraw, { deviceId });
     if (tier === "needs_plus") return { ok: false, reason: "needs_plus" };
     const holder = token();
-    if (!(await ctx.runMutation(internal.pipeline.acquireLock, { name: "fresh", holder, ttlMs: FRESH_LOCK_MS }))) {
-      if (tier === "free") await ctx.runMutation(internal.billing.returnFreeDraw, { deviceId });
-      return { ok: false, reason: "busy" };
-    }
+    let locked = false;
     let keepLock = false;
     try {
+      if (!demo) {
+        locked = await ctx.runMutation(internal.pipeline.acquireLock, { name: "fresh", holder, ttlMs: FRESH_LOCK_MS });
+        if (!locked) return { ok: false, reason: "busy" };
+      }
+      const pooled = await ctx.runMutation(internal.freshPool.claim, { lockToken: locked ? holder : undefined });
+      if (pooled) {
+        keepLock = true;
+        return { ok: true, comicId: pooled };
+      }
+      if (!locked) {
+        locked = await ctx.runMutation(internal.pipeline.acquireLock, { name: "fresh", holder, ttlMs: FRESH_LOCK_MS });
+        if (!locked) return { ok: false, reason: "busy" };
+      }
       const date = pacificDate(Date.now());
       if ((await ctx.runQuery(internal.pipeline.capLeft, { date })) < IMAGES_PER_COMIC) return { ok: false, reason: "spend_cap" };
-      const provider = getScriptProvider();
-      for (let tries = 0; tries < 2; tries++) {
-        const storyId =
-          (await ctx.runQuery(internal.pipeline.bestUnusedStory, { now: Date.now() })) ?? (tries === 0 ? await fallbackPick(ctx, provider, date) : null);
-        if (!storyId) break;
-        const outcome = await writeComic(ctx, provider, storyId, { fresh: true, lockToken: holder });
-        if (outcome.ok) {
-          keepLock = true;
-          return { ok: true, comicId: outcome.comicId };
-        }
-        if (outcome.reason === "spend_cap") return { ok: false, reason: "spend_cap" };
-      }
-      return { ok: false, reason: "no_story" };
+      const outcome = await drawLive(ctx, getScriptProvider(), date, holder);
+      keepLock = outcome.ok;
+      return outcome;
     } finally {
       if (!keepLock) {
-        await ctx.runMutation(internal.pipeline.releaseLock, { name: "fresh", holder });
+        if (locked) await ctx.runMutation(internal.pipeline.releaseLock, { name: "fresh", holder });
         if (tier === "free") await ctx.runMutation(internal.billing.returnFreeDraw, { deviceId });
       }
     }

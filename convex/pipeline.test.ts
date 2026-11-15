@@ -310,9 +310,14 @@ describe("pipeline:drawFreshOne", () => {
     expect(await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: "" })).toEqual({ ok: false, reason: "bad_secret" });
   });
 
-  test("no story", async () => {
+  test("no story anywhere draws a Slow news day comic instead of refusing", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 404 })));
     const t = convexTest(schema, modules);
-    expect(await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: SECRET })).toEqual({ ok: false, reason: "no_story" });
+    const res = await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: SECRET });
+    vi.unstubAllGlobals();
+    expect(res.ok).toBe(true);
+    await settleAll(t, 10_000);
+    expect((await t.query(api.editions.today, {}))!.comics[0]).toMatchObject({ sourceName: "Doodle Daily newsroom", sourceUrl: "", isNew: true });
     expect(await t.mutation(internal.pipeline.acquireLock, { name: "fresh", holder: "after", ttlMs: 1000 })).toBe(true);
   });
 

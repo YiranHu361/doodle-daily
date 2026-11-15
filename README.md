@@ -67,6 +67,21 @@ flowchart LR
 | **Revyl** | Builds the iOS app in the cloud as a standalone simulator build and runs it on a cloud iPhone. The plain-English Revyl tests in `.revyl/tests/` cover reading and clearing the day, reactions, Draw a fresh one, a paid Create a comic, back issues and the paywall, voice, and the Papers shelf; `.revyl/config.yaml` turns on proof of changes for pull requests. |
 | **Keiki** | Text Newsie on iMessage: send a link or a few words to the Doodle Daily agent and it texts back a finished comic with the real story, the source and a link into the app. |
 
+**Draw a fresh one keeps a small ready pool.** `convex/freshPool.ts` keeps
+`FRESH_POOL_SIZE` (default 3) comics in reserve. They are drawn by the normal
+pipeline from real unused stories, but carry a `pooled` flag, so every public
+query (editions, voice, reactions, Keiki) skips them. A press claims one pooled
+comic in a single mutation, answers at once with its id, and reveals it 7 seconds
+later at the top of the newest issue as a normal new comic; the app shows Robo
+drawing until it appears. The comic was drawn ahead of time, so the 7 seconds is a
+reveal delay, not drawing time. Each claim schedules a refill, and a cron tops the
+pool up every 10 minutes (`freshPool:topUp` runs it by hand). With an empty pool
+the press falls back to a live draw, which widens the story search to the last 7
+days, then runs a fresh ingest, and as a last resort draws a "Slow news day" strip
+about the cast with no factual claims and no source link. `DEMO_MODE=1` in the
+Convex environment lifts the one-free-draw-a-day check and lets pool draws run back
+to back; outside demo mode one draw at a time and the daily limit still apply.
+
 Where the build differs from the docs is written down in `NOTES.md`. The design
 system (neon arcade shell, crayon paper comics) is in `docs/DESIGN.md`, the product
 brief in `docs/BRIEF.md`, and the pitfalls we designed against in `docs/LESSONS.md`.
