@@ -96,7 +96,7 @@ function PanelPage({
   return (
     <View style={[styles.page, { width }]}>
       <Animated.View style={anim}>
-        <PaperSheet backlight={color} seed={index + 11} padding={10} style={{ width: sheet }}>
+        <PaperSheet backlight={color} seed={index + 11} padding={10} style={{ width: sheet }} arrived={panel.imageUrl !== null}>
           <View ref={setPicture} collapsable={false} onLayout={onPictureLayout} style={covered ? styles.hidden : null}>
             <PanelImage testID={`panel_${index}`} uri={panel.imageUrl} size={picture} label={panel.scene || `Panel ${index + 1}`} placeholderLabel={copy.drawingCard} />
           </View>

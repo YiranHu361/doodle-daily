@@ -61,7 +61,7 @@ export function ComicCard({
           glow={lead && ready ? color : null}
           style={lead ? styles.lead : styles.row}
         >
-          <PaperSheet backlight={color} seed={index + 3} padding={lead ? 8 : 6} backlightRadius={lead ? 16 : 8}>
+          <PaperSheet backlight={color} seed={index + 3} padding={lead ? 8 : 6} backlightRadius={lead ? 16 : 8} arrived={cover.imageUrl !== null}>
             <View ref={coverRef} collapsable={false}>
               <PanelImage uri={cover.imageUrl} size={coverSize} label={cover.scene || comic.title} placeholderLabel={copy.drawingCard} />
             </View>
