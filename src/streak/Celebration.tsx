@@ -203,7 +203,7 @@ function Piece({ burst, color, dx, dy, spin, w, h }: { burst: SharedValue<number
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: "rgba(7,5,26,0.95)" },
+  dim: { backgroundColor: "rgba(7,5,26,0.97)" },
   column: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, gap: 10 },
   title: { ...type.displayLg, fontSize: 40, color: colors.neon.volt, textAlign: "center", textShadowColor: colors.neon.volt, textShadowRadius: 12 },
   numberRow: { flexDirection: "row", alignItems: "center", gap: 6 },
@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   comboLabel: { ...type.body, color: colors.text.mid, marginTop: -8 },
   week: { alignSelf: "stretch", marginTop: 12 },
   bubble: { backgroundColor: colors.paper, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 18, marginTop: 14, maxWidth: 320 },
-  bubbleTail: { position: "absolute", top: -8, left: 40, width: 16, height: 16, backgroundColor: colors.paper, transform: [{ rotate: "45deg" }] },
+  bubbleTail: { position: "absolute", top: -8, left: "50%", marginLeft: -8, width: 16, height: 16, backgroundColor: colors.paper, transform: [{ rotate: "45deg" }] },
   bubbleText: { ...type.caption, color: colors.ink, textAlign: "center" },
   buttonWrap: { alignSelf: "stretch", marginTop: 18 },
   button: { minHeight: 52, alignItems: "center", justifyContent: "center" },

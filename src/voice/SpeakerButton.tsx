@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import { CutButton } from "../components/shapes";
@@ -24,6 +24,11 @@ export function SpeakerButton({ color }: { color: string }) {
   const voice = useVoiceSetting();
   const [showNote, setShowNote] = useState(false);
   const note = voice.on ? (voice.notice ?? (showNote ? AI_VOICE_NOTE : null)) : null;
+  useEffect(() => {
+    if (!showNote) return;
+    const t = setTimeout(() => setShowNote(false), 4000);
+    return () => clearTimeout(t);
+  }, [showNote]);
   return (
     <View>
       <CutButton
@@ -57,5 +62,15 @@ export function SpeakerButton({ color }: { color: string }) {
 const styles = StyleSheet.create({
   box: { width: 44, height: 44 },
   noteWrap: { position: "absolute", top: 50, right: 0, width: 260, alignItems: "flex-end", zIndex: 10 },
-  note: { ...type.meta, color: colors.text.mid, backgroundColor: colors.bg.void, paddingHorizontal: 8, paddingVertical: 4 },
+  note: {
+    ...type.meta,
+    color: colors.text.hi,
+    backgroundColor: colors.surface[2],
+    borderColor: colors.line.bright,
+    borderWidth: 1,
+    borderRadius: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    overflow: "hidden",
+  },
 });
