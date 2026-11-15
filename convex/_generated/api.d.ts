@@ -8,15 +8,33 @@
  * @module
  */
 
+import type * as admin from "../admin.js";
+import type * as cast from "../cast.js";
+import type * as crons from "../crons.js";
 import type * as editions from "../editions.js";
+import type * as ingest from "../ingest.js";
 import type * as lib_cast from "../lib/cast.js";
 import type * as lib_dates from "../lib/dates.js";
 import type * as lib_dto from "../lib/dto.js";
+import type * as lib_feeds from "../lib/feeds.js";
+import type * as lib_filter from "../lib/filter.js";
+import type * as lib_formats from "../lib/formats.js";
+import type * as lib_http from "../lib/http.js";
+import type * as lib_inflate from "../lib/inflate.js";
+import type * as lib_overlap from "../lib/overlap.js";
+import type * as lib_png from "../lib/png.js";
+import type * as lib_retry from "../lib/retry.js";
+import type * as lib_script from "../lib/script.js";
+import type * as lib_text from "../lib/text.js";
 import type * as lib_urls from "../lib/urls.js";
+import type * as pipeline from "../pipeline.js";
+import type * as providers_anthropic from "../providers/anthropic.js";
 import type * as providers_index from "../providers/index.js";
 import type * as providers_mockImage from "../providers/mockImage.js";
 import type * as providers_mockScript from "../providers/mockScript.js";
+import type * as providers_openai from "../providers/openai.js";
 import type * as providers_placeholder from "../providers/placeholder.js";
+import type * as providers_prompts from "../providers/prompts.js";
 import type * as providers_types from "../providers/types.js";
 import type * as reactions from "../reactions.js";
 import type * as seed from "../seed.js";
@@ -29,15 +47,33 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  admin: typeof admin;
+  cast: typeof cast;
+  crons: typeof crons;
   editions: typeof editions;
+  ingest: typeof ingest;
   "lib/cast": typeof lib_cast;
   "lib/dates": typeof lib_dates;
   "lib/dto": typeof lib_dto;
+  "lib/feeds": typeof lib_feeds;
+  "lib/filter": typeof lib_filter;
+  "lib/formats": typeof lib_formats;
+  "lib/http": typeof lib_http;
+  "lib/inflate": typeof lib_inflate;
+  "lib/overlap": typeof lib_overlap;
+  "lib/png": typeof lib_png;
+  "lib/retry": typeof lib_retry;
+  "lib/script": typeof lib_script;
+  "lib/text": typeof lib_text;
   "lib/urls": typeof lib_urls;
+  pipeline: typeof pipeline;
+  "providers/anthropic": typeof providers_anthropic;
   "providers/index": typeof providers_index;
   "providers/mockImage": typeof providers_mockImage;
   "providers/mockScript": typeof providers_mockScript;
+  "providers/openai": typeof providers_openai;
   "providers/placeholder": typeof providers_placeholder;
+  "providers/prompts": typeof providers_prompts;
   "providers/types": typeof providers_types;
   reactions: typeof reactions;
   seed: typeof seed;

@@ -77,6 +77,9 @@ export default defineSchema({
     status: comicStatus,
     hidden: v.optional(v.boolean()),
     fresh: v.optional(v.boolean()),
+    lockToken: v.optional(v.string()),
+    drawStartedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
     order: v.number(),
     createdAt: v.number(),
     deadline: v.number(),
@@ -113,6 +116,8 @@ export default defineSchema({
     name: castName,
     description: v.string(),
     sheetId: v.optional(v.id("_storage")),
+    refId: v.optional(v.id("_storage")),
+    updatedAt: v.optional(v.number()),
   }).index("by_name", ["name"]),
 
   spend: defineTable({
@@ -120,7 +125,26 @@ export default defineSchema({
     imagesReserved: v.number(),
     imagesUsed: v.number(),
     scriptCalls: v.number(),
+    inputTokens: v.optional(v.number()),
+    outputTokens: v.optional(v.number()),
   }).index("by_date", ["date"]),
+
+  locks: defineTable({
+    name: v.string(),
+    holder: v.string(),
+    expiresAt: v.number(),
+  }).index("by_name", ["name"]),
+
+  slots: defineTable({
+    slot: v.number(),
+    holder: v.optional(v.string()),
+    expiresAt: v.number(),
+  }).index("by_slot", ["slot"]),
+
+  memeFormats: defineTable({
+    name: v.string(),
+    fetchedAt: v.number(),
+  }).index("by_name", ["name"]),
 
   runs: defineTable({
     kind: v.string(),
