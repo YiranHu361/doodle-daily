@@ -26,6 +26,16 @@ export const textFailure = v.union(
   v.literal("bad_script"),
   v.literal("unfinished"),
 );
+export const sponsorKind = v.union(v.literal("creator"), v.literal("founder"));
+export const promo = v.object({
+  persona: sponsorKind,
+  section,
+  name: v.string(),
+  pitch: v.string(),
+  claims: v.array(v.string()),
+  cta: v.string(),
+  site: v.string(),
+});
 export const entitlementKind = v.union(v.literal("plus"), v.literal("paper"));
 export const comicStatus = v.union(
   v.literal("scripted"),
@@ -81,6 +91,10 @@ export default defineSchema({
     format: v.optional(v.string()),
     owner: v.optional(v.string()),
     unverified: v.optional(v.boolean()),
+    sponsored: v.optional(v.boolean()),
+    sponsorName: v.optional(v.string()),
+    sponsorKind: v.optional(sponsorKind),
+    ctaLabel: v.optional(v.string()),
     used: v.boolean(),
     claimedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -112,6 +126,9 @@ export default defineSchema({
     owner: v.optional(v.string()),
     unverified: v.optional(v.boolean()),
     sponsored: v.optional(v.boolean()),
+    sponsorName: v.optional(v.string()),
+    sponsorKind: v.optional(sponsorKind),
+    ctaLabel: v.optional(v.string()),
     replacedAt: v.optional(v.number()),
   })
     .index("by_edition_order", ["editionId", "order"])
@@ -203,6 +220,7 @@ export default defineSchema({
     refundId: v.optional(v.string()),
     refundOwed: v.optional(v.boolean()),
     unverified: v.optional(v.boolean()),
+    promo: v.optional(promo),
     error: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -275,6 +293,13 @@ export default defineSchema({
   })
     .index("by_device", ["deviceId"])
     .index("by_createdAt", ["createdAt"]),
+
+  promoUsage: defineTable({
+    deviceId: v.string(),
+    date: v.string(),
+    kind: v.union(v.literal("reply"), v.literal("transcribe"), v.literal("check")),
+    count: v.number(),
+  }).index("by_device_date_kind", ["deviceId", "date", "kind"]),
 
   runs: defineTable({
     kind: v.string(),

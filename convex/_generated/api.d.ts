@@ -37,6 +37,7 @@ import type * as lib_webhook from "../lib/webhook.js";
 import type * as lib_whop from "../lib/whop.js";
 import type * as papers from "../papers.js";
 import type * as pipeline from "../pipeline.js";
+import type * as promote from "../promote.js";
 import type * as providers_anthropic from "../providers/anthropic.js";
 import type * as providers_index from "../providers/index.js";
 import type * as providers_mockImage from "../providers/mockImage.js";
@@ -86,6 +87,7 @@ declare const fullApi: ApiFromModules<{
   "lib/whop": typeof lib_whop;
   papers: typeof papers;
   pipeline: typeof pipeline;
+  promote: typeof promote;
   "providers/anthropic": typeof providers_anthropic;
   "providers/index": typeof providers_index;
   "providers/mockImage": typeof providers_mockImage;

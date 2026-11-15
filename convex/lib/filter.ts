@@ -79,3 +79,23 @@ export function storyRefusal(text: string, opts: { sourced: boolean }): Refusal 
 export function isSafeStory(text: string): boolean {
   return storyRefusal(text, { sourced: true }) === null;
 }
+
+const AD_RULES: RegExp[] = [
+  /\b(casinos?|gambl\w*|betting|sportsbooks?|poker|lottery|lotteries|wager\w*|parlays?|bookmakers?)\b/i,
+  /\b(adult (?:content|site|sites|videos?|entertainment)|xxx|nsfw|erotic\w*|strip ?clubs?|hookups?)\b/i,
+  /\b(guns?|firearms?|rifles?|pistols?|handguns?|ammo|ammunition|weapons?|knives|tactical gear|explosives?)\b/i,
+  /\b(cannabis|marijuana|weed|thc|cbd|vapes?|vaping|cocaine|psychedelics?|psilocybin|magic mushrooms|kratom|steroids?|nicotine|tobacco|cigarettes?|cigars?|drugs?)\b/i,
+  /\b(vote for|re-?elect|elect me|campaign for|candidate|candidates|ballot|super ?pac|political party|democrats?|republicans?|midterms?)\b/i,
+  /\b(guarantee\w* (?:\w+ )?(?:returns?|profits?|income|results|gains|yield)|risk[- ]free|get rich|double your money|can't lose|cannot lose|cures?|cured|heals?|healing|treats? (?:anxiety|depression|diabetes|cancer|acne|pain)|weight loss|lose \d+ ?(?:lbs|pounds|kg)|miracle|clinically proven|fda[- ]approved)\b/i,
+  /\b(sucks|scams?|scammers?|frauds?|liars?|rip-?offs?|garbage|losers?|idiots?|clowns?|dinosaurs?|is dead|are dead)\b/i,
+];
+const COMPETITOR_ATTACK = /\b(?:better than|unlike|beats|crushes|destroys|kills|kill|replaces|ditch|ditches|vs\.?|versus)\s+[A-Z][\w.&-]+/;
+
+export type AdRefusal = Refusal | "ad_rules";
+
+export function adRefusal(text: string): AdRefusal | null {
+  let cleaned = text;
+  for (const re of SAFE_PHRASES) cleaned = cleaned.replace(re, " ");
+  if (AD_RULES.some((re) => re.test(cleaned)) || COMPETITOR_ATTACK.test(cleaned)) return "ad_rules";
+  return storyRefusal(text, { sourced: true });
+}

@@ -1,7 +1,7 @@
 import { v, type Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { section, comicKind, editionStatus, reactionKind } from "../schema";
+import { section, comicKind, editionStatus, reactionKind, sponsorKind } from "../schema";
 
 export const panelDTO = v.object({
   scene: v.string(),
@@ -23,6 +23,10 @@ export const comicDTO = v.object({
   createdAt: v.number(),
   isNew: v.boolean(),
   unverified: v.boolean(),
+  sponsored: v.boolean(),
+  sponsorName: v.optional(v.string()),
+  sponsorKind: v.optional(sponsorKind),
+  ctaLabel: v.optional(v.string()),
   panels: v.array(panelDTO),
 });
 
@@ -63,7 +67,7 @@ export function isVisible(comic: Doc<"comics">): boolean {
 }
 
 export function isCreatedFor(comic: Doc<"comics">, viewer: string | undefined): boolean {
-  return comic.kind !== "commission" || (comic.owner !== undefined && comic.owner === viewer);
+  return comic.kind !== "commission" || comic.sponsored === true || (comic.owner !== undefined && comic.owner === viewer);
 }
 
 export function isReplaceable(comic: Doc<"comics">): boolean {
@@ -106,6 +110,8 @@ export async function toComicDTO(ctx: QueryCtx, comic: Doc<"comics">): Promise<C
     createdAt: comic.createdAt,
     isNew: comic.fresh === true,
     unverified: comic.unverified === true,
+    sponsored: comic.sponsored === true,
+    ...(comic.sponsored ? { sponsorName: comic.sponsorName, sponsorKind: comic.sponsorKind, ctaLabel: comic.ctaLabel } : {}),
     panels,
   };
 }
