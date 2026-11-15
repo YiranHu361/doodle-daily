@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { parseFeed, parseFinnhub, parseHnItem, parsePosts, parseTrends, postUrl, trendItems } from "./feeds";
-import { isSafeStory } from "./filter";
+import { isSafeStory, storyRefusal } from "./filter";
 import { describeFormat, formatKeyFor, EVERGREEN_FORMATS } from "./formats";
 import { sharesEvent } from "./overlap";
 import { constantTimeEqual, isQuotaError, parseRetryAfter, retryDelayMs } from "./retry";
@@ -103,13 +103,51 @@ describe("story filter", () => {
     "Earthquake shakes the city",
     "New cancer drug approved",
     "Coach accused of abuse",
+    "Executive charged with manslaughter",
+  ])("refuses %s as tragedy, sourced or not", (title) => {
+    expect(storyRefusal(title, { sourced: true })).toBe("tragedy");
+    expect(storyRefusal(title, { sourced: false })).toBe("tragedy");
+    expect(isSafeStory(title)).toBe(false);
+  });
+
+  test.each([
     "Star's affair revealed",
+    "Acme chief executive Jane Smith's affairs come to light",
+    "Explicit sexual content found in app",
+    "Senator's divorce gets messy",
+    "Founder's wife files for custody",
+    "Chief executive's health scare",
+    "CEO fired over relationship with an employee",
+  ])("refuses %s as private_life, sourced or not", (title) => {
+    expect(storyRefusal(title, { sourced: true })).toBe("private_life");
+    expect(storyRefusal(title, { sourced: false })).toBe("private_life");
+  });
+
+  test.each([
+    "My neighbour was arrested",
+    "Local man sues the city over a parking ticket",
+    "A woman in Ohio was charged with fraud",
+    "My boss got fired for lying",
+  ])("refuses %s as private_person, sourced or not", (title) => {
+    expect(storyRefusal(title, { sourced: true })).toBe("private_person");
+    expect(storyRefusal(title, { sourced: false })).toBe("private_person");
+  });
+
+  test.each([
     "CEO arrested at airport",
     "Founder indicted on fraud charges",
     "Former exec jailed for five years",
     "Manager charged over chip smuggling",
-    "Explicit sexual content found in app",
-  ])("drops %s", (title) => expect(isSafeStory(title)).toBe(false));
+    "Acme sued by shareholders over its forecasts",
+    "Acme chief executive Jane Smith resigns after board review",
+    "Regulators open an investigation into Acme's chief executive",
+    "Jury convicts crypto founder of fraud",
+    "Acme fires its chief financial officer",
+    "Tesla's ex-CEO steps down from the board",
+  ])("a feed story keeps %s (business and legal news with a source)", (title) => {
+    expect(isSafeStory(title)).toBe(true);
+    expect(storyRefusal(title, { sourced: true })).toBeNull();
+  });
 
   test.each([
     "Stocks crash as rates rise",
@@ -117,7 +155,29 @@ describe("story filter", () => {
     "Cyberattack hits a retailer's checkout",
     "The streaming wars get a new player",
     "Bitcoin prices plunge again",
+    "Apple's health app adds a step counter",
+    "A new dating app for dogs",
   ])("keeps %s", (title) => expect(isSafeStory(title)).toBe(true));
+
+  test.each([
+    "Acme chief executive Jane Smith is being investigated",
+    "Jane Smith arrested for insider trading",
+    "Tesla's CEO is under investigation",
+    "Senator Bob Jones took bribes",
+  ])("an unsourced claim of legal trouble by a named person needs a source: %s", (topic) => {
+    expect(storyRefusal(topic, { sourced: false })).toBe("needs_source");
+    expect(storyRefusal(topic, { sourced: true })).toBeNull();
+  });
+
+  test.each([
+    "Acme is being sued by a rival",
+    "Jane Smith launches a new phone",
+    "Our seed round",
+    "My cat runs a bakery",
+    "Why everyone wants a standing desk",
+  ])("an unsourced topic about companies, products, ideas, own life or professional work is fine: %s", (topic) => {
+    expect(storyRefusal(topic, { sourced: false })).toBeNull();
+  });
 });
 
 function goodScript(): Script {
@@ -173,9 +233,36 @@ describe("script validation", () => {
 
   test("rejects banned topics and non-objects", () => {
     const s = goodScript();
-    s.panels[0].caption = "The founder was arrested on Tuesday.";
-    expect(validateScript(s, opts).join()).toMatch(/banned topic/);
+    s.panels[0].caption = "The founder was hospitalized on Tuesday.";
+    expect(validateScript(s, opts).join()).toMatch(/banned topic \(death, violence/);
+    s.panels[0].caption = "The founder's affair made the news.";
+    expect(validateScript(s, opts).join()).toMatch(/banned topic \(sex or someone's private life\)/);
     expect(validateScript(null, opts)).toEqual(["answer is not an object"]);
+  });
+
+  function legalScript(attribution: string): Script {
+    return {
+      title: "The boss gets a visit",
+      panels: [
+        { scene: "Boss Blob sits at a big desk.", cast: ["Boss Blob"], caption: `${attribution} regulators are investigating the Acme chief executive.` },
+        { scene: "The Crowd peeks through a window.", cast: ["The Crowd"], caption: `${attribution} the probe is about the company's accounts.` },
+        { scene: "Coin hides under the desk.", cast: ["Coin", "Boss Blob"], caption: `${attribution} Acme denies any wrongdoing.` },
+        { scene: "Newsie shrugs on a lamp.", cast: ["Newsie"], caption: `${attribution} no charges have been filed.` },
+      ],
+      realStory: "Regulators are investigating the Acme chief executive. Acme denies any wrongdoing.",
+    };
+  }
+
+  test("a legal story is allowed when every caption names the source", () => {
+    const legal = { kind: "news" as const, headline: "Regulators investigate Acme chief executive" };
+    expect(validateScript(legalScript("Reuters reports"), legal)).toEqual([]);
+    expect(validateScript(legalScript("According to Reuters,"), legal)).toEqual([]);
+    expect(validateScript(legalScript("Reuters reports"), { ...legal, source: "Reuters" })).toEqual([]);
+    const missing = validateScript(legalScript("Apparently"), legal);
+    expect(missing).toHaveLength(4);
+    expect(missing[0]).toMatch(/panel 1 caption must name the source/);
+    const wrong = validateScript(legalScript("Bloomberg reports"), { ...legal, source: "Reuters" });
+    expect(wrong.join("\n")).toMatch(/panel 1 caption must name the source, as in Reuters reports/);
   });
 });
 

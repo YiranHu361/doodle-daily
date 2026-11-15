@@ -5,7 +5,7 @@ import { action, internalAction, internalMutation, internalQuery, query, type Mu
 import { pacificDate } from "./lib/dates";
 import { checkDeviceId } from "./lib/device";
 import { USER_AGENT_HEADERS } from "./lib/feeds";
-import { isSafeStory } from "./lib/filter";
+import { storyRefusal } from "./lib/filter";
 import { fetchText } from "./lib/http";
 import { cut, decodeEntities } from "./lib/text";
 import { createCheckout, planId, whop, whopConfig } from "./lib/whop";
@@ -17,6 +17,7 @@ const IMAGES_PER_COMIC = 4;
 const WATCH_EVERY_MS = 20_000;
 const WATCH_LIMIT = 75;
 export const COMMISSION_SOURCE = "Commissioned by a reader";
+export const NEEDS_SOURCE_MESSAGE = "That one needs a source. Paste a link to the article and Robo will draw it.";
 
 export type PageMeta = { title: string; description: string };
 
@@ -53,7 +54,12 @@ export function parseLink(raw: string): string | null {
 
 const startResult = v.union(
   v.object({ ok: v.literal(true), commissionId: v.id("commissions"), url: v.string() }),
-  v.object({ ok: v.literal(false), reason: v.union(v.literal("not_allowed"), v.literal("spend_cap"), v.literal("bad_input"), v.literal("unavailable")) }),
+  v.object({
+    ok: v.literal(false),
+    reason: v.union(v.literal("not_allowed"), v.literal("spend_cap"), v.literal("bad_input"), v.literal("unavailable")),
+    refusal: v.optional(v.union(v.literal("needs_source"), v.literal("private_life"), v.literal("tragedy"), v.literal("private_person"))),
+    message: v.optional(v.string()),
+  }),
 );
 type StartResult = typeof startResult.type;
 
@@ -86,6 +92,7 @@ export const start = action({
     if (topic.length > TOPIC_MAX || (!topic && !rawLink)) return { ok: false, reason: "bad_input" };
     let link: string | undefined;
     let page: PageMeta = { title: "", description: "" };
+    let publisher = "";
     if (rawLink) {
       const parsed = parseLink(rawLink);
       if (!parsed) return { ok: false, reason: "bad_input" };
@@ -93,6 +100,8 @@ export const start = action({
       const res = await fetchText(parsed, { headers: USER_AGENT_HEADERS, timeoutMs: 6000 });
       if (res.ok) page = pageMeta(res.text);
       if (!page.title) return { ok: false, reason: "bad_input" };
+      const siteName = res.ok ? decodeEntities(metaContent(res.text.slice(0, 200_000), ["og:site_name"])).replace(/\s+/g, " ").trim() : "";
+      publisher = cut(siteName, 80) || new URL(parsed).hostname.replace(/^www\./, "");
     }
     const headline = topic || page.title;
     const facts = [
@@ -100,12 +109,14 @@ export const start = action({
         [
           page.title ? `The linked page is titled ${page.title.replace(/[.!?]+$/, "")}.` : "",
           page.description,
+          publisher ? `The article was published by ${publisher}.` : "",
           topic ? `A reader commissioned a comic about ${topic.replace(/[.!?]+$/, "")}.` : "",
           "The reader wants a light, friendly four-panel strip about it.",
         ].filter(Boolean),
       ),
     ];
-    if (!isSafeStory(`${headline} ${facts.join(" ")}`)) return { ok: false, reason: "not_allowed" };
+    const refusal = storyRefusal(`${headline} ${facts.join(" ")}`, { sourced: !!link });
+    if (refusal) return { ok: false, reason: "not_allowed", refusal, ...(refusal === "needs_source" ? { message: NEEDS_SOURCE_MESSAGE } : {}) };
     if ((await ctx.runQuery(internal.pipeline.capLeft, { date: pacificDate(Date.now()) })) < IMAGES_PER_COMIC) return { ok: false, reason: "spend_cap" };
     if (!whopConfig().ok) return { ok: false, reason: "unavailable" };
     const commissionId = await ctx.runMutation(internal.commissions.create, { deviceId: args.deviceId, topic: topic || page.title, link, headline, facts });
