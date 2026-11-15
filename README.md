@@ -10,7 +10,7 @@ You can also:
 
 - **Draw a fresh one**: Robo, the mascot, draws a new comic from the latest stories
   while you watch, panel by panel.
-- **Commission a comic** about anything (a topic or an article link) for $1.
+- **Create a comic** about anything (a topic or an article link) for $1.
 - **Listen**: tap the speaker in the Reader and Newsie reads the captions and the
   real story aloud.
 - **Get Plus** ($3 a month): every back issue, unlimited fresh draws, a weekly
@@ -44,8 +44,8 @@ flowchart LR
 | **Capy** | Wrote the whole app. Each build step is a thread with its own prompt in `prompts/` (scaffold, backend pipeline, app screens, combo and Robo, Whop, polish and tests, voice, Keiki), run in parallel on separate machines and shipped as the pull requests listed below. |
 | **Convex** | The entire backend (`convex/`): schema, live queries the app subscribes to, crons for the morning edition, the scripted pipeline (ingest, editor, writer, artist) with retries, locks, deadlines and a daily spend cap, file storage for the pictures and voice clips, and the HTTP routes for Whop webhooks. |
 | **OpenAI** | Draws every panel with the image edits API, using the five cast sheets as references so the characters stay on model, and voices the narration with `gpt-4o-mini-tts`. The editor and writer run on Anthropic's API. |
-| **Whop** | Payments, in the Whop sandbox: the $1 commission checkout, the Plus membership, combo milestones that extend Plus by a day through the memberships API, refunds when a commission fails, and one Whop product plus monthly plan per "Start your own paper". Webhooks are verified (Standard Webhooks) and deduplicated in Convex. |
-| **Revyl** | Builds the iOS app in the cloud as a standalone simulator build and runs it on a cloud iPhone. The plain-English Revyl tests in `.revyl/tests/` cover reading and clearing the day, reactions, Draw a fresh one, a paid commission, back issues and the paywall, voice, and the Papers shelf; `.revyl/config.yaml` turns on proof of changes for pull requests. |
+| **Whop** | Payments, in the Whop sandbox: the $1 Create a comic checkout, the Plus membership, combo milestones that extend Plus by a day through the memberships API, refunds when a created comic fails, and one Whop product plus monthly plan per "Start your own paper". Webhooks are verified (Standard Webhooks) and deduplicated in Convex. |
+| **Revyl** | Builds the iOS app in the cloud as a standalone simulator build and runs it on a cloud iPhone. The plain-English Revyl tests in `.revyl/tests/` cover reading and clearing the day, reactions, Draw a fresh one, a paid Create a comic, back issues and the paywall, voice, and the Papers shelf; `.revyl/config.yaml` turns on proof of changes for pull requests. |
 | **Keiki** | Text Newsie on iMessage: send a link or a few words to the Doodle Daily agent and it texts back a finished comic with the real story, the source and a link into the app. |
 
 Where the build differs from the docs is written down in `NOTES.md`. The design
@@ -110,7 +110,7 @@ revyl test run read-and-clear-the-day
 | [#7](https://github.com/yiranhu361/doodle-daily/pull/7) | Keiki spike findings |
 | [#8](https://github.com/yiranhu361/doodle-daily/pull/8) | Voice: Newsie reads comics aloud (OpenAI speech) |
 | [#9](https://github.com/yiranhu361/doodle-daily/pull/9) | Phone checks on main and the demo-secret build recipe |
-| [#10](https://github.com/yiranhu361/doodle-daily/pull/10) | Whop payments: commissions, Plus, combo pays for Plus, Start your own paper |
+| [#10](https://github.com/yiranhu361/doodle-daily/pull/10) | Whop payments: Create a comic, Plus, combo pays for Plus, Start your own paper |
 | [#12](https://github.com/yiranhu361/doodle-daily/pull/12) | Revyl tests and this README |
 
 The Keiki iMessage thread (Text Newsie) is still running and adds its own pull

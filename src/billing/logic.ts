@@ -20,9 +20,9 @@ export function commissionLine(status: CommissionStatus): string {
     case "awaiting_payment":
       return "Waiting for your payment. Finish the checkout, then come back here.";
     case "paid":
-      return "Paid. Robo is sharpening crayons.";
+      return "Paid. Creating your comic.";
     case "drawing":
-      return "Robo is drawing it now.";
+      return "Creating your comic. Robo is drawing it now.";
     case "ready":
       return "Done! It's at the top of Today.";
     case "failed":
@@ -35,7 +35,7 @@ export function commissionLine(status: CommissionStatus): string {
 export function startFailMessage(reason: StartFailure): string {
   switch (reason) {
     case "not_allowed":
-      return "Robo keeps the paper friendly and won't draw that one. Try another topic.";
+      return "Robo skips stories about private lives, crime and tragedy. Try another topic.";
     case "spend_cap":
       return "Robo is out of crayons for today. Try again tomorrow.";
     case "bad_input":

@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { CutBox, CutButton } from "../components/shapes";
@@ -10,15 +10,15 @@ export function BillingSheet({ visible, onClose, testID, children }: { visible: 
   const { height } = useWindowDimensions();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.root}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.root}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
         <View testID={testID} accessibilityViewIsModal style={[styles.sheet, { maxHeight: height * 0.92, paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.grabber} />
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
             {children}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -79,7 +79,7 @@ export function CrownIcon({ size = 34 }: { size?: number }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(7,5,26,0.6)" },
-  sheet: { backgroundColor: colors.surface[1], borderTopWidth: 1.5, borderColor: colors.line.bright, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  sheet: { flexShrink: 1, backgroundColor: colors.surface[1], borderTopWidth: 1.5, borderColor: colors.line.bright, borderTopLeftRadius: 4, borderTopRightRadius: 4 },
   grabber: { alignSelf: "center", width: 40, height: 4, borderRadius: 2, backgroundColor: colors.line.dim, marginTop: 8 },
   body: { padding: 24, paddingTop: 16, gap: 14 },
   header: { flexDirection: "row", alignItems: "center", gap: 12 },

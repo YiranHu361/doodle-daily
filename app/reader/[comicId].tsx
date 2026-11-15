@@ -140,7 +140,7 @@ function RealStoryPage({ comic, width, read, onJump, onOpenSource }: { comic: Co
         <View style={styles.sourceRow}>
           <Text style={styles.sourceLabel}>{copy.source}</Text>
           <Text testID="sourceName" style={styles.sourceName}>
-            {comic.sourceName || "Unknown source"}
+            {comic.kind === "commission" ? "Created by a reader" : comic.sourceName || "Unknown source"}
           </Text>
         </View>
         {comic.sourceUrl ? <PrimaryButton testID="openSourceButton" label={copy.openSource} onPress={onOpenSource} /> : null}

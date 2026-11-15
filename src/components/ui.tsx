@@ -107,7 +107,7 @@ export function NewBadge({ style, label = "NEW" }: { style?: StyleProp<ViewStyle
   }, [reduce, scale]);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }, { rotate: "-6deg" }] }));
   return (
-    <Animated.View style={[styles.newBadge, anim, style]} accessibilityLabel={label === "NEW" ? "New" : "Commissioned"} accessible pointerEvents="none">
+    <Animated.View style={[styles.newBadge, anim, style]} accessibilityLabel={label === "NEW" ? "New" : "Created"} accessible pointerEvents="none">
       <Text style={styles.newText} maxFontSizeMultiplier={1.2}>
         {label}
       </Text>

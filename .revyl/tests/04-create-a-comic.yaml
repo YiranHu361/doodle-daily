@@ -1,6 +1,6 @@
 test:
   metadata:
-    name: "Commission a comic"
+    name: "Create a comic"
     platform: ios
     tags:
       - whop
@@ -14,9 +14,9 @@ test:
     - type: instructions
       step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
     - type: instructions
-      step_description: "Tap the 'Commission' button at the bottom right of Today"
+      step_description: "Tap the 'Create' button at the bottom right of Today"
     - type: validation
-      step_description: "A sheet titled 'Commission a comic' is showing with a text box"
+      step_description: "A sheet titled 'Create a comic' is showing with a text box"
     - type: instructions
       step_description: "Tap the text box and type 'a robot learns to fold laundry'"
     - type: instructions
@@ -26,11 +26,11 @@ test:
     - type: instructions
       step_description: "If the browser is still open after paying, tap 'Done' or close it to return to the app"
     - type: validation
-      step_description: "The commission sheet shows a status line about the comic, such as Robo drawing it, with pulsing dots or a finished message"
+      step_description: "The sheet shows a status line such as 'Creating your comic', with pulsing dots, or a finished message"
     - type: manual
       step_type: wait
       step_description: "90"
     - type: instructions
-      step_description: "If the commission sheet is still open, close it with the X"
+      step_description: "If the 'Create a comic' sheet is still open, close it with the X"
     - type: validation
-      step_description: "The first comic card on Today has a 'Commissioned' or 'NEW' badge"
+      step_description: "The first comic card on Today has a yellow 'CREATED' badge"
