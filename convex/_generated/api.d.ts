@@ -16,6 +16,7 @@ import type * as crons from "../crons.js";
 import type * as editions from "../editions.js";
 import type * as http from "../http.js";
 import type * as ingest from "../ingest.js";
+import type * as keiki from "../keiki.js";
 import type * as lib_cast from "../lib/cast.js";
 import type * as lib_dates from "../lib/dates.js";
 import type * as lib_device from "../lib/device.js";
@@ -63,6 +64,7 @@ declare const fullApi: ApiFromModules<{
   editions: typeof editions;
   http: typeof http;
   ingest: typeof ingest;
+  keiki: typeof keiki;
   "lib/cast": typeof lib_cast;
   "lib/dates": typeof lib_dates;
   "lib/device": typeof lib_device;

@@ -16,6 +16,16 @@ export const commissionStatus = v.union(
   v.literal("failed"),
   v.literal("refunded"),
 );
+export const textFailure = v.union(
+  v.literal("limit"),
+  v.literal("spend_cap"),
+  v.literal("unsafe"),
+  v.literal("needs_source"),
+  v.literal("bad_link"),
+  v.literal("bad_input"),
+  v.literal("bad_script"),
+  v.literal("unfinished"),
+);
 export const entitlementKind = v.union(v.literal("plus"), v.literal("paper"));
 export const comicStatus = v.union(
   v.literal("scripted"),
@@ -189,6 +199,23 @@ export default defineSchema({
   })
     .index("by_device_createdAt", ["deviceId", "createdAt"])
     .index("by_payment", ["whopPaymentId"]),
+
+  textCommissions: defineTable({
+    sender: v.string(),
+    date: v.string(),
+    topic: v.string(),
+    link: v.optional(v.string()),
+    headline: v.string(),
+    facts: v.array(v.string()),
+    status: v.union(v.literal("drawing"), v.literal("ready"), v.literal("failed")),
+    reason: v.optional(textFailure),
+    error: v.optional(v.string()),
+    comicId: v.optional(v.id("comics")),
+    notifiedAt: v.optional(v.number()),
+    noticeError: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_sender_date", ["sender", "date"]),
 
   webhookEvents: defineTable({
     eventId: v.string(),
