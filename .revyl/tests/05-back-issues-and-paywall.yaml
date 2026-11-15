@@ -1,0 +1,27 @@
+test:
+  metadata:
+    name: "Back issues and the Plus paywall"
+    platform: ios
+    tags:
+      - archive
+      - whop
+  build:
+    name: "doodle-daily"
+  device:
+    model: "iPhone 16"
+    orientation: portrait
+  blocks:
+    - type: instructions
+      step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
+    - type: instructions
+      step_description: "Scroll down to the very end of Today, past the last comic card"
+    - type: validation
+      step_description: "The footer shows a 'Back issues' button and the line 'That's the whole issue. Go outside.'"
+    - type: instructions
+      step_description: "Tap 'Back issues'"
+    - type: validation
+      step_description: "A 'Back issues' screen shows either a list of issues with dates or 'NO BACK ISSUES YET'"
+    - type: instructions
+      step_description: "If any issue row shows a lock icon, tap that row"
+    - type: validation
+      step_description: "If a locked row was tapped, a sheet titled 'Doodle Daily Plus' shows '$3 a month', a 'Get Plus' button and the line about earning a free day every 7-day combo"

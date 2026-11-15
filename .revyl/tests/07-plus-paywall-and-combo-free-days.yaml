@@ -1,0 +1,20 @@
+test:
+  metadata:
+    name: "Plus paywall and combo free days"
+    platform: ios
+    tags:
+      - whop
+  build:
+    name: "doodle-daily"
+  device:
+    model: "iPhone 16"
+    orientation: portrait
+  blocks:
+    - type: instructions
+      step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
+    - type: instructions
+      step_description: "Scroll to the very end of Today and tap 'Back issues', then tap a row with a lock icon if there is one; if there is none, go back and tap the 'Draw a fresh one' button until a 'Doodle Daily Plus' sheet appears or the button reads 'Robo is on it'"
+    - type: validation
+      step_description: "If a 'Doodle Daily Plus' sheet is showing, it lists every back issue, unlimited 'Draw a fresh one', a weekly combo freeze, and says Plus members earn a free day every 7-day combo"
+    - type: validation
+      step_description: "If a 'Doodle Daily Plus' sheet is showing, it has a 'Start your own paper' link near the bottom"

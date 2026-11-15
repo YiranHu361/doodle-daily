@@ -1,0 +1,28 @@
+test:
+  metadata:
+    name: "Draw a fresh one"
+    platform: ios
+    tags:
+      - pipeline
+  build:
+    name: "doodle-daily"
+  device:
+    model: "iPhone 16"
+    orientation: portrait
+  blocks:
+    - type: instructions
+      step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
+    - type: extraction
+      step_description: "The title text of the first comic card on Today"
+      variable_name: "firstTitle"
+    - type: instructions
+      step_description: "Tap the yellow 'Draw a fresh one' button at the bottom of the screen"
+    - type: validation
+      step_description: "The button now reads 'Robo is on it', or a sheet titled 'Doodle Daily Plus' appeared because today's free draw is used up"
+    - type: manual
+      step_type: wait
+      step_description: "60"
+    - type: instructions
+      step_description: "If a 'Doodle Daily Plus' sheet is showing, stop here; otherwise scroll to the top of Today"
+    - type: validation
+      step_description: "Either the 'Doodle Daily Plus' sheet is showing, or the first comic card has a different title from {{firstTitle}}, a yellow 'NEW' badge and a picture"

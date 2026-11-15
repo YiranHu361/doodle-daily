@@ -1,0 +1,44 @@
+test:
+  metadata:
+    name: "Read and clear the day"
+    platform: ios
+    tags:
+      - smoke
+      - combo
+  build:
+    name: "doodle-daily"
+  device:
+    model: "iPhone 16"
+    orientation: portrait
+  blocks:
+    - type: instructions
+      step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
+    - type: validation
+      step_description: "The Today screen shows the DOODLE DAILY wordmark and at least one comic card with a crayon picture"
+    - type: instructions
+      step_description: "Tap the picture on the first (largest) comic card"
+    - type: validation
+      step_description: "A comic opens full screen with a paper sheet showing a picture and a caption, and '1/4' at the top right"
+    - type: instructions
+      step_description: "Swipe left on the paper sheet"
+    - type: instructions
+      step_description: "Swipe left on the paper sheet"
+    - type: instructions
+      step_description: "Swipe left on the paper sheet"
+    - type: validation
+      step_description: "The counter at the top right shows '4/4'"
+    - type: instructions
+      step_description: "Swipe left on the paper sheet"
+    - type: validation
+      step_description: "The page shows the heading 'THE REAL STORY', a short summary and a 'Source' label with a source name under it"
+    - type: manual
+      step_type: wait
+      step_description: "5"
+    - type: validation
+      step_description: "A full-screen overlay shows 'DAY CLEARED' and a large number 1 next to a lightning bolt"
+    - type: instructions
+      step_description: "Tap 'Keep reading'"
+    - type: instructions
+      step_description: "Tap the close button (the X) at the top left"
+    - type: validation
+      step_description: "The first comic card on Today has a red 'READ' stamp and the combo pill at the top right shows 1"
