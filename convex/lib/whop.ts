@@ -11,7 +11,8 @@ export function whopConfig(): WhopConfig {
   return { ok: true, apiKey, companyId: process.env.WHOP_COMPANY_ID ?? "" };
 }
 
-export function planId(kind: "commission" | "plus"): string {
+export function planId(kind: "commission" | "plus" | "promo"): string {
+  if (kind === "promo") return process.env.WHOP_PLAN_PROMO || planId("commission");
   return (kind === "commission" ? process.env.WHOP_PLAN_COMMISSION : process.env.WHOP_PLAN_PLUS) ?? "";
 }
 

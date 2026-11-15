@@ -10,7 +10,7 @@ import { UNVERIFIED_SENTENCE } from "./lib/script";
 import { fetchText } from "./lib/http";
 import { cut, decodeEntities } from "./lib/text";
 import { createCheckout, planId, whop, whopConfig } from "./lib/whop";
-import { commissionStatus } from "./schema";
+import { commissionStatus, promo } from "./schema";
 
 export const TOPIC_MAX = 140;
 const LINK_MAX = 2000;
@@ -91,11 +91,19 @@ export function parseLink(raw: string): string | null {
 
 export type LinkRead = { page: PageMeta; publisher: string; slug: { headline: string; fact: string } | null };
 
+export function siteName(html: string, link: string): string {
+  const name = decodeEntities(metaContent(html.slice(0, 200_000), ["og:site_name"])).replace(/\s+/g, " ").trim();
+  return cut(name, 80) || publisherFor(link);
+}
+
+export function fetchPage(link: string) {
+  return fetchText(link, { headers: USER_AGENT_HEADERS, timeoutMs: 6000 });
+}
+
 export async function readLink(link: string): Promise<LinkRead | null> {
-  const res = await fetchText(link, { headers: USER_AGENT_HEADERS, timeoutMs: 6000 });
+  const res = await fetchPage(link);
   const page = res.ok ? pageMeta(res.text) : { title: "", description: "" };
-  const siteName = res.ok ? decodeEntities(metaContent(res.text.slice(0, 200_000), ["og:site_name"])).replace(/\s+/g, " ").trim() : "";
-  const publisher = cut(siteName, 80) || publisherFor(link);
+  const publisher = res.ok ? siteName(res.text, link) : publisherFor(link);
   if (page.title) return { page, publisher, slug: null };
   const headline = slugHeadline(link);
   return headline ? { page, publisher, slug: { headline, fact: `A link a reader pasted from ${publisher} is titled: ${headline}. ${UNVERIFIED_SENTENCE}` } } : null;
@@ -122,6 +130,7 @@ export const create = internalMutation({
     headline: v.string(),
     facts: v.array(v.string()),
     unverified: v.optional(v.boolean()),
+    promo: v.optional(promo),
   },
   returns: v.id("commissions"),
   handler: async (ctx, args) => {
@@ -237,7 +246,7 @@ export const markPaid = internalMutation({
     const id = ctx.db.normalizeId("commissions", commissionId);
     const row = id ? await ctx.db.get(id) : null;
     if (!row || row.deviceId !== deviceId) return "ignored: unknown commission";
-    if (variantId && variantId !== planId("commission")) return "ignored: not the commission plan";
+    if (variantId && variantId !== planId("commission") && variantId !== planId("promo")) return "ignored: not the commission plan";
     if (checkoutId && row.checkoutId && checkoutId !== row.checkoutId) return "ignored: checkout mismatch";
     if (row.status !== "awaiting_payment") return `ignored: already ${row.status}`;
     await ctx.db.patch(row._id, { status: "paid", whopPaymentId: paymentId || undefined, error: undefined, updatedAt: Date.now() });
@@ -262,13 +271,13 @@ export const beginDraw = internalMutation({
   args: { commissionId: v.id("commissions") },
   returns: v.union(
     v.null(),
-    v.object({ headline: v.string(), facts: v.array(v.string()), link: v.string(), deviceId: v.string(), unverified: v.boolean() }),
+    v.object({ headline: v.string(), facts: v.array(v.string()), link: v.string(), deviceId: v.string(), unverified: v.boolean(), promo: v.optional(promo) }),
   ),
   handler: async (ctx, { commissionId }) => {
     const row = await ctx.db.get(commissionId);
     if (!row || row.status !== "paid") return null;
     await ctx.db.patch(commissionId, { status: "drawing", updatedAt: Date.now() });
-    return { headline: row.headline, facts: row.facts, link: row.link ?? "", deviceId: row.deviceId, unverified: row.unverified === true };
+    return { headline: row.headline, facts: row.facts, link: row.link ?? "", deviceId: row.deviceId, unverified: row.unverified === true, promo: row.promo };
   },
 });
 
@@ -292,11 +301,12 @@ export const draw = internalAction({
       const res = await ctx.runAction(internal.pipeline.drawFromBrief, {
         headline: brief.headline,
         facts: brief.facts,
-        sourceName: COMMISSION_SOURCE,
+        sourceName: brief.promo ? brief.promo.site : COMMISSION_SOURCE,
         sourceUrl: brief.link,
         kind: "commission",
-        owner: brief.deviceId,
+        owner: brief.promo ? undefined : brief.deviceId,
         unverified: brief.unverified || undefined,
+        ...(brief.promo ? { section: brief.promo.section, sponsor: { name: brief.promo.name, kind: brief.promo.persona, cta: brief.promo.cta } } : {}),
       });
       if (res.ok) await ctx.runMutation(internal.commissions.drawStarted, { commissionId, comicId: res.comicId });
       else await ctx.runMutation(internal.commissions.fail, { commissionId, error: `draw refused: ${res.reason}` });

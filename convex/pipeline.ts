@@ -12,7 +12,7 @@ import {
 import { pacificDate } from "./lib/dates";
 import { isReplaceable } from "./lib/dto";
 import { isAggregatorUrl, publisherOf, type Section } from "./lib/feeds";
-import { isSafeStory } from "./lib/filter";
+import { adRefusal, isSafeStory } from "./lib/filter";
 import { describeFormat, formatKeyFor, formatsForPicker } from "./lib/formats";
 import { sharesEvent } from "./lib/overlap";
 import { constantTimeEqual, MAX_PANEL_ATTEMPTS, retryDelayMs } from "./lib/retry";
@@ -20,7 +20,7 @@ import { cleanScript, validateScript, type Script } from "./lib/script";
 import { cut } from "./lib/text";
 import { ingestAll, type IngestReport } from "./ingest";
 import { getImageProvider, getScriptProvider, panelPrompt, type ScriptProvider } from "./providers";
-import { comicKind, section } from "./schema";
+import { comicKind, section, sponsorKind } from "./schema";
 
 export const COMIC_DEADLINE_MS = 10 * 60 * 1000;
 export const HARD_STOP_MS = 20 * 60 * 1000;
@@ -72,6 +72,10 @@ const storyInput = v.object({
   format: v.optional(v.string()),
   owner: v.optional(v.string()),
   unverified: v.optional(v.boolean()),
+  sponsored: v.optional(v.boolean()),
+  sponsorName: v.optional(v.string()),
+  sponsorKind: v.optional(sponsorKind),
+  ctaLabel: v.optional(v.string()),
 });
 type StoryInput = typeof storyInput.type;
 
@@ -516,10 +520,26 @@ export async function writeValidScript(ctx: ActionCtx, provider: ScriptProvider,
       continue;
     }
     const errors = validateScript(result.script, { kind: story.kind === "meme" ? "meme" : "news", headline: story.headline, unverified: story.unverified === true });
+    if (story.sponsored && errors.length === 0 && adRefusal(scriptWords(result.script))) errors.push("the comic breaks the ad rules; keep it a friendly, factual promotion");
     if (errors.length === 0) return cleanScript(result.script);
     repair = { previous: result.script, errors };
   }
   return { error: `script failed validation: ${(repair?.errors ?? []).slice(0, 4).join("; ")}` };
+}
+
+function scriptWords(script: Script): string {
+  return [script.title, script.realStory, ...script.panels.map((p) => p.caption)].join(" ");
+}
+
+async function secondSlot(ctx: MutationCtx, editionId: Id<"editions">): Promise<number> {
+  const comics = await ctx.db
+    .query("comics")
+    .withIndex("by_edition_order", (q) => q.eq("editionId", editionId))
+    .take(64);
+  const leadAt = comics.findIndex((c) => c.status !== "failed" && c.hidden !== true && c.pooled !== true && c.replacedAt === undefined && (c.kind !== "commission" || c.sponsored === true) && c.kind !== "paper-sample");
+  if (leadAt < 0) return comics.length ? comics[comics.length - 1].order + 1 : 0;
+  const next = comics[leadAt + 1];
+  return next ? (comics[leadAt].order + next.order) / 2 : comics[leadAt].order + 1;
 }
 
 type WriteOutcome = { ok: true; comicId: Id<"comics"> } | { ok: false; reason: "taken" | "bad_script" | "spend_cap" | "no_edition" };
@@ -572,8 +592,8 @@ export const startComic = internalMutation({
       .withIndex("by_edition_order", (q) => q.eq("editionId", edition._id))
       .order(fresh ? "asc" : "desc")
       .first();
-    const replaced = replace ? await replaceTop(ctx, edition._id, now) : null;
-    const order = replaced ? replaced.order : existing ? existing.order + (fresh ? -1 : 1) : 0;
+    const replaced = replace && !story.sponsored ? await replaceTop(ctx, edition._id, now) : null;
+    const order = story.sponsored ? await secondSlot(ctx, edition._id) : replaced ? replaced.order : existing ? existing.order + (fresh ? -1 : 1) : 0;
     const comicId = await ctx.db.insert("comics", {
       editionId: edition._id,
       storyId,
@@ -593,6 +613,7 @@ export const startComic = internalMutation({
       panels: script.panels.map((p) => ({ scene: p.scene, cast: p.cast, caption: p.caption })),
       owner: story.owner,
       unverified: story.unverified || undefined,
+      ...(story.sponsored ? { sponsored: true, sponsorName: story.sponsorName, sponsorKind: story.sponsorKind, ctaLabel: story.ctaLabel } : {}),
     });
     if (!pooled && edition.status !== "building") await ctx.db.patch(edition._id, { status: "building" });
     for (let index = 0; index < 4; index++) await ctx.scheduler.runAfter(0, internal.pipeline.drawPanel, { comicId, index, attempt: 1 });
@@ -1029,6 +1050,8 @@ export const drawFromBrief = internalAction({
     kind: comicKind,
     owner: v.optional(v.string()),
     unverified: v.optional(v.boolean()),
+    section: v.optional(section),
+    sponsor: v.optional(v.object({ name: v.string(), kind: sponsorKind, cta: v.string() })),
   },
   returns: briefResult,
   handler: async (ctx, args): Promise<BriefResult> => {
@@ -1036,12 +1059,13 @@ export const drawFromBrief = internalAction({
     const facts = args.facts.map((f) => f.trim()).filter(Boolean).slice(0, 8).map((f) => cut(f, 600));
     if (!headline || headline.length > 300 || facts.length === 0) return { ok: false, reason: "bad_brief" };
     if (!isSafeStory(`${headline} ${facts.join(" ")}`)) return { ok: false, reason: "unsafe" };
+    if (args.sponsor && adRefusal([headline, ...facts].join(" "))) return { ok: false, reason: "unsafe" };
     const date = pacificDate(Date.now());
     if ((await ctx.runQuery(internal.pipeline.capLeft, { date })) < IMAGES_PER_COMIC) return { ok: false, reason: "spend_cap" };
     const [storyId] = await ctx.runMutation(internal.pipeline.saveStories, {
       stories: [
         {
-          section: sectionForBrief(`${headline} ${facts.join(" ")}`, args.kind),
+          section: args.section ?? sectionForBrief(`${headline} ${facts.join(" ")}`, args.kind),
           kind: args.kind,
           headline: cut(headline, 200),
           facts,
@@ -1051,10 +1075,11 @@ export const drawFromBrief = internalAction({
           score: 0,
           owner: args.owner,
           unverified: args.unverified || undefined,
+          ...(args.sponsor ? { sponsored: true, sponsorName: cut(args.sponsor.name, 60), sponsorKind: args.sponsor.kind, ctaLabel: cut(args.sponsor.cta, 40) } : {}),
         },
       ],
     });
-    const outcome = await writeComic(ctx, getScriptProvider(), storyId, { fresh: true });
+    const outcome = await writeComic(ctx, getScriptProvider(), storyId, { fresh: !args.sponsor });
     if (outcome.ok) return { ok: true, comicId: outcome.comicId };
     return { ok: false, reason: outcome.reason === "spend_cap" ? "spend_cap" : "bad_script" };
   },

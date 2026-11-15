@@ -1,12 +1,28 @@
-import type { ReactNode } from "react";
+import { useRef, type ComponentRef, type ReactNode } from "react";
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { CutBox, CutButton } from "../components/shapes";
 import { colors, cut, space, type } from "../theme";
 
-export function BillingSheet({ visible, onClose, testID, children }: { visible: boolean; onClose: () => void; testID: string; children: ReactNode }) {
+export function BillingSheet({
+  visible,
+  onClose,
+  testID,
+  children,
+  stickToEnd,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  testID: string;
+  children: ReactNode;
+  stickToEnd?: boolean;
+}) {
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const toEnd = () => {
+    if (stickToEnd) scrollRef.current?.scrollToEnd({ animated: true });
+  };
   const { height } = useWindowDimensions();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -14,7 +30,11 @@ export function BillingSheet({ visible, onClose, testID, children }: { visible: 
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
         <View testID={testID} accessibilityViewIsModal style={[styles.sheet, { maxHeight: height * 0.92, paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.grabber} />
-          <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
+          <ScrollView
+            ref={scrollRef}
+            onContentSizeChange={toEnd}
+            onLayout={toEnd}
+            contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false}>
             {children}
           </ScrollView>
         </View>

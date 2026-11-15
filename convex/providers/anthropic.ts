@@ -83,7 +83,7 @@ export async function callClaude(
   apiKey: string,
   prompt: string,
   schema: JsonSchema,
-  opts: { timeoutMs: number; retries: number; maxTokens: number },
+  opts: { timeoutMs: number; retries: number; maxTokens: number; model?: string },
 ): Promise<CallResult> {
   let last: CallResult = { ok: false, reason: "not attempted" };
   for (let attempt = 0; attempt <= opts.retries; attempt++) {
@@ -94,7 +94,7 @@ export async function callClaude(
       maxBytes: 2 * 1024 * 1024,
       headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": API_VERSION },
       body: JSON.stringify({
-        model: ANTHROPIC_MODEL,
+        model: opts.model ?? ANTHROPIC_MODEL,
         max_tokens: opts.maxTokens,
         messages: [{ role: "user", content: prompt }],
         output_config: { format: { type: "json_schema", schema } },

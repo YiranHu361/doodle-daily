@@ -137,13 +137,29 @@ function RealStoryPage({ comic, width, read, onJump, onOpenSource }: { comic: Co
         <Text testID="realStory" style={styles.realBody}>
           {comic.realStory}
         </Text>
-        <View style={styles.sourceRow}>
-          <Text style={styles.sourceLabel}>{copy.source}</Text>
-          <Text testID="sourceName" style={styles.sourceName}>
-            {comic.kind === "commission" ? "Created by a reader" : comic.sourceName || "Unknown source"}
-          </Text>
-        </View>
-        {comic.sourceUrl ? <PrimaryButton testID="openSourceButton" label={copy.openSource} onPress={onOpenSource} /> : null}
+        {comic.sponsored ? (
+          <View style={styles.sourceRow}>
+            <Text style={styles.sourceLabel}>{comic.sponsorName ? `Sponsored by ${comic.sponsorName}` : "Sponsored"}</Text>
+            <Text testID="sourceName" style={styles.sourceName}>
+              {comic.unverified || !comic.sourceName ? "Claims not checked" : `Claims checked against ${comic.sourceName}`}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.sourceRow}>
+            <Text style={styles.sourceLabel}>{copy.source}</Text>
+            <Text testID="sourceName" style={styles.sourceName}>
+              {comic.kind === "commission" ? "Created by a reader" : comic.sourceName || "Unknown source"}
+            </Text>
+          </View>
+        )}
+        {comic.sourceUrl ? (
+          <PrimaryButton
+            testID={comic.sponsored ? "ctaButton" : "openSourceButton"}
+            label={comic.sponsored ? comic.ctaLabel || copy.openSource : copy.openSource}
+            accessibilityLabel={comic.sponsored ? `${comic.ctaLabel || copy.openSource}, opens ${comic.sponsorName || "the sponsor"}'s link` : undefined}
+            onPress={onOpenSource}
+          />
+        ) : null}
         {read ? <ReadStamp /> : null}
       </CutBox>
     </ScrollView>
@@ -262,10 +278,11 @@ function ReaderView({ comic }: { comic: Comic }) {
                   {page < REAL_STORY_PAGE ? <Text style={styles.counterText}>{page + 1}/4</Text> : <CompassIcon color={color} />}
                 </View>
               </View>
-              <SectionTag section={comic.section} unverified={comic.unverified} />
+              <SectionTag section={comic.section} unverified={comic.unverified} sponsored={comic.sponsored} />
               <Text style={styles.title} numberOfLines={2} accessibilityRole="header">
                 {comic.title}
               </Text>
+              {comic.sponsored && comic.sponsorName ? <Text style={styles.by}>by {comic.sponsorName}</Text> : null}
             </View>
           </GestureDetector>
           <View style={styles.flex} onLayout={(e) => setPageHeight(e.nativeEvent.layout.height)}>
@@ -338,6 +355,7 @@ const styles = StyleSheet.create({
   counter: { minWidth: 44, alignItems: "flex-end" },
   counterText: { fontFamily: type.displaySm.fontFamily, fontSize: 18, color: colors.text.hi },
   title: { ...type.title, color: colors.text.hi },
+  by: { ...type.chip, color: colors.text.mid },
   page: { justifyContent: "center", alignItems: "center" },
   caption: { ...type.caption, color: colors.ink, paddingHorizontal: 6, paddingTop: 10, paddingBottom: 6, lineHeight: 24 },
   realScroll: { padding: space.margin, paddingTop: 12 },

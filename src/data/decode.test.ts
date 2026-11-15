@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { decodeCounts, decodeDrawResult, decodeEdition, decodeSummaries } from "./decode";
+import { decodeComic, decodeCounts, decodeDrawResult, decodeEdition, decodeSummaries } from "./decode";
 
 const panel = (i: number, imageUrl: string | null = `https://x/${i}.png`) => ({ scene: "s", caption: `c${i}`, cast: ["Robo"], imageUrl });
 const comic = (id: string, extra: Record<string, unknown> = {}) => ({
@@ -67,4 +67,23 @@ test("draw results decode every reason and reject unknown ones", () => {
   }
   expect(decodeDrawResult({ ok: false, reason: "weird" })).toBeNull();
   expect(decodeDrawResult({ ok: true })).toBeNull();
+});
+
+test("sponsor fields are read only for sponsored comics and checked defensively", () => {
+  expect(decodeComic(comic("a"))).toMatchObject({ sponsored: false });
+  expect(decodeComic(comic("a"))).not.toHaveProperty("sponsorName");
+  expect(decodeComic(comic("b", { sponsored: true, sponsorName: " Inkwell ", sponsorKind: "founder", ctaLabel: "Try it free", kind: "commission" }))).toMatchObject({
+    sponsored: true,
+    sponsorName: "Inkwell",
+    sponsorKind: "founder",
+    ctaLabel: "Try it free",
+    kind: "commission",
+  });
+  const odd = decodeComic(comic("c", { sponsored: true, sponsorName: 7, sponsorKind: "brand", ctaLabel: "  " }))!;
+  expect(odd.sponsored).toBe(true);
+  expect(odd).not.toHaveProperty("sponsorName");
+  expect(odd).not.toHaveProperty("sponsorKind");
+  expect(odd).not.toHaveProperty("ctaLabel");
+  expect(decodeComic(comic("d", { sponsored: "yes", sponsorName: "X" }))).toMatchObject({ sponsored: false });
+  expect(decodeComic(comic("d", { sponsored: "yes", sponsorName: "X" }))).not.toHaveProperty("sponsorName");
 });
