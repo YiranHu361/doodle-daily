@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { CutBox, CutButton } from "../components/shapes";
@@ -10,7 +10,7 @@ export function BillingSheet({ visible, onClose, testID, children }: { visible: 
   const { height } = useWindowDimensions();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.root}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.root}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" />
         <View testID={testID} accessibilityViewIsModal style={[styles.sheet, { maxHeight: height * 0.92, paddingBottom: insets.bottom + 16 }]}>
           <View style={styles.grabber} />
@@ -18,7 +18,7 @@ export function BillingSheet({ visible, onClose, testID, children }: { visible: 
             {children}
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
