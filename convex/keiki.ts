@@ -242,6 +242,16 @@ export function noticeText(commissionId: string, status: string): string {
   return `The comic this person texted in (commission ${commissionId}) ${what}. Call get_comic_status with commission_id ${commissionId} now and send them what it returns, following your instructions for a ready or failed comic.`;
 }
 
+export function noticeOutcome(body: string): string | null {
+  try {
+    const parsed = JSON.parse(body) as { results?: { outcome?: unknown }[] };
+    const outcome = parsed.results?.[0]?.outcome;
+    return typeof outcome === "string" ? outcome : null;
+  } catch {
+    return null;
+  }
+}
+
 export const notify = internalAction({
   args: { commissionId: v.id("textCommissions") },
   returns: v.null(),
@@ -260,7 +270,9 @@ export const notify = internalAction({
       body: JSON.stringify({ text: noticeText(commissionId, target.status), phone: target.sender }),
       timeoutMs: NOTICE_TIMEOUT_MS,
     });
-    await ctx.runMutation(internal.keiki.noticeSent, { commissionId, error: res.ok ? undefined : `notice ${res.status}: ${cut(res.error, 200)}` });
+    const outcome = res.ok ? noticeOutcome(res.text) : null;
+    const error = !res.ok ? `notice ${res.status}: ${cut(res.error, 200)}` : outcome === "unavailable" ? "notice unavailable for this conversation" : undefined;
+    await ctx.runMutation(internal.keiki.noticeSent, { commissionId, error });
     return null;
   },
 });

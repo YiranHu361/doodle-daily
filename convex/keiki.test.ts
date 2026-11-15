@@ -1,7 +1,7 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { internal } from "./_generated/api";
-import { parseToolPath, splitRequest, TEXTS_PER_DAY } from "./keiki";
+import { noticeOutcome, parseToolPath, splitRequest, TEXTS_PER_DAY } from "./keiki";
 import schema from "./schema";
 import { setProvidersForTests } from "./providers";
 import { modules } from "./test.setup";
@@ -159,6 +159,12 @@ describe("keiki helpers", () => {
   test("splits a texted link from the words around it", () => {
     expect(splitRequest("look at this https://a.example.com/x?y=1).")).toEqual({ link: "https://a.example.com/x?y=1", topic: "look at this" });
     expect(splitRequest("  the Fed   meeting ")).toEqual({ link: null, topic: "the Fed meeting" });
+  });
+
+  test("reads the notice outcome for the one conversation", () => {
+    expect(noticeOutcome(JSON.stringify({ ok: true, results: [{ phone: "+1555", outcome: "unavailable" }] }))).toBe("unavailable");
+    expect(noticeOutcome(JSON.stringify({ ok: true, results: [{ outcome: "ran" }] }))).toBe("ran");
+    expect(noticeOutcome("not json")).toBeNull();
   });
 
   test("reads the secret and tool from the path", () => {
