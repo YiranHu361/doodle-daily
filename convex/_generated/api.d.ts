@@ -14,6 +14,7 @@ import type * as cast from "../cast.js";
 import type * as commissions from "../commissions.js";
 import type * as crons from "../crons.js";
 import type * as editions from "../editions.js";
+import type * as freshPool from "../freshPool.js";
 import type * as http from "../http.js";
 import type * as ingest from "../ingest.js";
 import type * as keiki from "../keiki.js";
@@ -62,6 +63,7 @@ declare const fullApi: ApiFromModules<{
   commissions: typeof commissions;
   crons: typeof crons;
   editions: typeof editions;
+  freshPool: typeof freshPool;
   http: typeof http;
   ingest: typeof ingest;
   keiki: typeof keiki;

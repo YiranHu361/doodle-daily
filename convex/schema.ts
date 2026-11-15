@@ -98,6 +98,8 @@ export default defineSchema({
     status: comicStatus,
     hidden: v.optional(v.boolean()),
     fresh: v.optional(v.boolean()),
+    pooled: v.optional(v.boolean()),
+    revealAt: v.optional(v.number()),
     lockToken: v.optional(v.string()),
     drawStartedAt: v.optional(v.number()),
     error: v.optional(v.string()),
@@ -111,7 +113,8 @@ export default defineSchema({
     unverified: v.optional(v.boolean()),
   })
     .index("by_edition_order", ["editionId", "order"])
-    .index("by_status_deadline", ["status", "deadline"]),
+    .index("by_status_deadline", ["status", "deadline"])
+    .index("by_pooled", ["pooled", "createdAt"]),
 
   editions: defineTable({
     date: v.string(),

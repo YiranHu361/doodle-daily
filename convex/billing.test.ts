@@ -6,6 +6,7 @@ import schema from "./schema";
 import { modules } from "./test.setup";
 import { addDays, pacificDate } from "./lib/dates";
 import { signWebhook } from "./lib/webhook";
+import { imageCap } from "./pipeline";
 import { setProvidersForTests } from "./providers";
 
 const SECRET = "ws_test_secret_value";
@@ -418,7 +419,8 @@ describe("free draws and freezes", () => {
 
   test("a draw that does not start gives the free draw back", async () => {
     const t = convexTest(schema, modules);
-    expect(await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: "demo" })).toEqual({ ok: false, reason: "no_story" });
+    await t.mutation(internal.pipeline.reserveImages, { date: pacificDate(Date.now()), count: imageCap() - 1 });
+    expect(await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: "demo" })).toEqual({ ok: false, reason: "spend_cap" });
     expect((await t.query(api.billing.status, { deviceId: DEVICE })).freeDrawsLeftToday).toBe(1);
   });
 
