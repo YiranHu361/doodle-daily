@@ -1,5 +1,5 @@
 import { useAction, useQuery } from "convex/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useState, type ReactNode } from "react";
 import { StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../convex/_generated/api";
 import { useToast } from "../components/Toast";
@@ -9,7 +9,9 @@ import { Robo } from "../robo/Robo";
 import { colors, cut, type } from "../theme";
 import { openCheckout, useBillingDevice } from "./hooks";
 import { commissionArgs, commissionLine, refusalMessage, startFailMessage, TOPIC_MAX, type CommissionStatus } from "./logic";
-import { BillingSheet, PencilIcon, SheetHeader, SmallButton } from "./Sheet";
+import { ChatStep, DoneStep, LinkStep, SectionStep, StatusStep, WhoStep } from "./promote/Steps";
+import { canGoBack, initialPromoState, promoReducer, stepLine, stepTitle } from "./promoteLogic";
+import { BillingSheet, PencilIcon, QuietLink, SheetHeader, SmallButton } from "./Sheet";
 
 const DONE: CommissionStatus[] = ["ready", "failed", "refunded"];
 
@@ -33,21 +35,52 @@ export function CommissionButton() {
   );
 }
 
-function CommissionSheet({
-  deviceId,
-  visible,
-  commissionId,
-  onStarted,
-  onClose,
-  onFinished,
-}: {
+type SheetProps = {
   deviceId: string;
   visible: boolean;
   commissionId: string | null;
   onStarted: (id: string) => void;
   onClose: () => void;
   onFinished: () => void;
-}) {
+};
+
+function CommissionSheet(props: SheetProps) {
+  const { deviceId, visible, onClose, onFinished } = props;
+  const [state, dispatch] = useReducer(promoReducer, initialPromoState);
+  const onPrivateDone = useCallback(() => {
+    onFinished();
+    dispatch({ type: "reset" });
+  }, [onFinished]);
+  const done = () => {
+    dispatch({ type: "reset" });
+    onClose();
+  };
+
+  if (state.step === "me") {
+    return (
+      <PrivateCreate {...props} onFinished={onPrivateDone}>
+        {props.commissionId ? null : <QuietLink testID="promoBack" label="Back" onPress={() => dispatch({ type: "back" })} />}
+      </PrivateCreate>
+    );
+  }
+
+  const step = { state, dispatch, deviceId };
+  const drawing = state.step === "status";
+  return (
+    <BillingSheet visible={visible} onClose={onClose} testID="commissionSheet" stickToEnd={state.step === "chat"}>
+      <SheetHeader title={stepTitle(state)} line={stepLine(state)} art={<Robo pose={drawing ? "drawing" : state.step === "done" ? "cheer" : "idle"} size={64} />} onClose={onClose} />
+      {canGoBack(state) ? <QuietLink testID="promoBack" label="Back" onPress={() => dispatch({ type: "back" })} /> : null}
+      {state.step === "who" ? <WhoStep dispatch={dispatch} /> : null}
+      {state.step === "section" ? <SectionStep dispatch={dispatch} /> : null}
+      {state.step === "chat" ? <ChatStep {...step} /> : null}
+      {state.step === "link" ? <LinkStep {...step} /> : null}
+      {state.step === "status" ? <StatusStep {...step} /> : null}
+      {state.step === "done" ? <DoneStep state={state} onDone={done} /> : null}
+    </BillingSheet>
+  );
+}
+
+function PrivateCreate({ deviceId, visible, commissionId, onStarted, onClose, onFinished, children }: SheetProps & { children: ReactNode }) {
   const toast = useToast();
   const start = useAction(api.commissions.start);
   const mine = useQuery(api.commissions.mine, commissionId ? { deviceId } : "skip");
@@ -94,6 +127,7 @@ function CommissionSheet({
   return (
     <BillingSheet visible={visible} onClose={onClose} testID="commissionSheet">
       <SheetHeader title="Create a comic" line="Robo draws anything, for $1." art={<Robo pose={status && !DONE.includes(status) ? "drawing" : "idle"} size={64} />} onClose={onClose} />
+      {children}
       {status ? (
         <View style={styles.statusBox}>
           <CutBox cut={cut.card} fill={colors.surface[2]} stroke={status === "failed" || status === "refunded" ? colors.state.error : colors.neon.volt} style={styles.status}>

@@ -78,7 +78,7 @@ export function SecondaryButton({
   );
 }
 
-export function SectionTag({ section, unverified }: { section: Section; unverified?: boolean }) {
+export function SectionTag({ section, unverified, sponsored }: { section: Section; unverified?: boolean; sponsored?: boolean }) {
   const color = sectionColor[section];
   const tag = (
     <CutBox cut={cut.chip} fill={colors.surface[2]} stroke={color} strokeWidth={1} style={styles.tag}>
@@ -87,15 +87,24 @@ export function SectionTag({ section, unverified }: { section: Section; unverifi
       </Text>
     </CutBox>
   );
-  if (!unverified) return tag;
+  if (!unverified && !sponsored) return tag;
   return (
     <View style={styles.tagRow}>
       {tag}
-      <CutBox cut={cut.chip} fill={colors.surface[2]} stroke={colors.stamp} strokeWidth={1} style={styles.tag}>
-        <Text style={[styles.tagText, { color: colors.stamp }]} maxFontSizeMultiplier={1.4} accessibilityLabel="Unverified link">
-          UNVERIFIED LINK
-        </Text>
-      </CutBox>
+      {sponsored ? (
+        <CutBox testID="sponsoredTag" cut={cut.chip} fill={colors.neon.volt} stroke={colors.neon.volt} strokeWidth={1} style={styles.tag}>
+          <Text style={[styles.tagText, { color: colors.text.onNeon }]} maxFontSizeMultiplier={1.4} accessibilityLabel="Sponsored">
+            SPONSORED
+          </Text>
+        </CutBox>
+      ) : null}
+      {unverified ? (
+        <CutBox cut={cut.chip} fill={colors.surface[2]} stroke={colors.stamp} strokeWidth={1} style={styles.tag}>
+          <Text style={[styles.tagText, { color: colors.stamp }]} maxFontSizeMultiplier={1.4} accessibilityLabel={sponsored ? "Claims not checked" : "Unverified link"}>
+            {sponsored ? "CLAIMS NOT CHECKED" : "UNVERIFIED LINK"}
+          </Text>
+        </CutBox>
+      ) : null}
     </View>
   );
 }

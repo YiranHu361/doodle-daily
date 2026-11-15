@@ -14,6 +14,7 @@ import type {
 const SECTIONS: readonly Section[] = ["tech", "money", "culture", "memes"];
 const STATUSES: readonly ComicStatus[] = ["scripted", "drawing", "ready"];
 const KINDS: readonly Comic["kind"][] = ["news", "meme", "commission"];
+const SPONSOR_KINDS: readonly NonNullable<Comic["sponsorKind"]>[] = ["creator", "founder"];
 const REACTIONS: readonly ReactionKind[] = ["lol", "wow", "yikes"];
 const DRAW_REASONS: readonly DrawReason[] = ["bad_secret", "no_story", "spend_cap", "busy", "needs_plus"];
 
@@ -46,6 +47,10 @@ export function decodeComic(raw: unknown): Comic | null {
   const panels = raw.panels.map(decodePanel);
   if (panels.some((p) => p === null)) return null;
   const kind = str(raw.kind) as Comic["kind"] | null;
+  const sponsored = raw.sponsored === true;
+  const sponsorName = sponsored ? str(raw.sponsorName)?.trim() : undefined;
+  const sponsorKind = sponsored ? (str(raw.sponsorKind) as Comic["sponsorKind"] | null) : null;
+  const ctaLabel = sponsored ? str(raw.ctaLabel)?.trim() : undefined;
   return {
     _id,
     section,
@@ -59,6 +64,10 @@ export function decodeComic(raw: unknown): Comic | null {
     createdAt: num(raw.createdAt) ?? 0,
     isNew: raw.isNew === true,
     unverified: raw.unverified === true,
+    sponsored,
+    ...(sponsorName ? { sponsorName } : {}),
+    ...(sponsorKind && SPONSOR_KINDS.includes(sponsorKind) ? { sponsorKind } : {}),
+    ...(ctaLabel ? { ctaLabel } : {}),
     panels: panels as Panel[],
   };
 }

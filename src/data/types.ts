@@ -17,6 +17,10 @@ export type Comic = {
   createdAt: number;
   isNew: boolean;
   unverified?: boolean;
+  sponsored?: boolean;
+  sponsorName?: string;
+  sponsorKind?: "creator" | "founder";
+  ctaLabel?: string;
   panels: Panel[];
 };
 

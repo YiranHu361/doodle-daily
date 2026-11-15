@@ -43,8 +43,8 @@
       [
         "expo-audio",
         {
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
+          "microphonePermission": "Doodle Daily uses the microphone so you can tell Robo about your promotion by voice.",
+          "recordAudioAndroid": true,
           "enableBackgroundPlayback": false
         }
       ]
