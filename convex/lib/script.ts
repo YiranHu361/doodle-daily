@@ -1,5 +1,5 @@
 import { CAST_NAMES, isCastName } from "./cast";
-import { isSafeStory } from "./filter";
+import { isLegalStory, storyRefusal } from "./filter";
 import { sentenceCount, wordCount } from "./text";
 
 export type ScriptPanel = { scene: string; cast: string[]; caption: string };
@@ -26,7 +26,16 @@ export function headlineNames(headline: string): string[] {
   return [...names];
 }
 
-export function validateScript(script: unknown, opts: { kind: "news" | "meme" | "commission"; headline: string }): string[] {
+const ATTRIBUTION = /\baccording to \S+|\S+ (?:reports?|reported|says|said|writes|wrote|alleges|alleged)\b/i;
+
+const REFUSAL_TOPICS = {
+  tragedy: "death, violence, disasters, illness or abuse",
+  private_life: "sex or someone's private life",
+  private_person: "a private individual",
+  needs_source: "an unsourced claim",
+} as const;
+
+export function validateScript(script: unknown, opts: { kind: "news" | "meme" | "commission"; headline: string; source?: string }): string[] {
   const errors: string[] = [];
   const s = script as Partial<Script> | null;
   if (!s || typeof s !== "object") return ["answer is not an object"];
@@ -65,7 +74,16 @@ export function validateScript(script: unknown, opts: { kind: "news" | "meme" | 
     if (PEOPLE.test(sceneWithoutCast)) errors.push(`panel ${n} scene shows a person who is not a cast member`);
   });
   const words = [s.title, s.realStory, ...s.panels.map((p) => `${p?.caption ?? ""} ${p?.scene ?? ""}`)].filter((t) => typeof t === "string").join(" ");
-  if (!isSafeStory(words)) errors.push("the comic touches a banned topic (death, violence, disasters, illness, abuse, sex, or crime)");
+  const refusal = storyRefusal(words, { sourced: true });
+  if (refusal) errors.push(`the comic touches a banned topic (${REFUSAL_TOPICS[refusal]})`);
+  else if (isLegalStory(`${opts.headline} ${words}`)) {
+    const source = opts.source?.trim().toLowerCase();
+    s.panels.forEach((p, i) => {
+      const caption = typeof p?.caption === "string" ? p.caption : "";
+      const named = source ? caption.toLowerCase().includes(source) : ATTRIBUTION.test(caption);
+      if (!named) errors.push(`panel ${i + 1} caption must name the source, as in ${opts.source?.trim() || "the outlet"} reports ..., because this is a legal or business story about real people`);
+    });
+  }
   const wanted = opts.kind === "meme" ? 1 : 2;
   if (typeof s.realStory !== "string" || !s.realStory.trim()) errors.push("realStory is missing");
   else if (sentenceCount(s.realStory) !== wanted) errors.push(`realStory must be exactly ${wanted} sentence${wanted === 1 ? "" : "s"}`);

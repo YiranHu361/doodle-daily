@@ -15,6 +15,14 @@ const PLUS_PLAN = "plan_plus_test";
 const COMMISSION_PLAN = "plan_commission_test";
 const DAY = 24 * 60 * 60 * 1000;
 
+const INVESTIGATION_URL = "https://news.example.com/acme-ceo-investigated";
+const AFFAIR_URL = "https://news.example.com/acme-ceo-affairs";
+const ARTICLES: Record<string, string> = {
+  [INVESTIGATION_URL]:
+    '<html><head><meta property="og:site_name" content="Example News"><meta property="og:title" content="Regulators investigate Acme chief executive Jane Smith"><meta property="og:description" content="Regulators opened an investigation into the accounts."></head></html>',
+  [AFFAIR_URL]: '<html><head><meta property="og:title" content="Acme chief executive Jane Smith and her affairs"></head></html>',
+};
+
 type T = ReturnType<typeof convexTest>;
 type Call = { method: string; url: string; body: unknown };
 
@@ -46,6 +54,8 @@ function fakeWhop(input: RequestInfo | URL, init?: RequestInit): Promise<Respons
       json({ id: mem[1], status: membershipStatus, variant_id: PLUS_PLAN, current_period_end: new Date(periodEnd).toISOString(), metadata: { kind: "plus", deviceId: DEVICE } }),
     );
   }
+  const article = ARTICLES[url];
+  if (article) return Promise.resolve(new Response(article, { status: 200, headers: { "Content-Type": "text/html" } }));
   const refund = /\/payments\/(pay_\w+)\/refund$/.exec(url);
   if (refund) return Promise.resolve(json({ id: refund[1], status: "paid", refunded_amount: 1 }));
   return Promise.resolve(json({ error: { message: "not found" } }, 404));
@@ -135,14 +145,33 @@ describe("POST /whop", () => {
 });
 
 describe("commissions", () => {
-  test("a banned topic is refused before any checkout exists", async () => {
+  test("a banned topic is refused with a reason before any checkout exists", async () => {
     const t = convexTest(schema, modules);
-    expect(await t.action(api.commissions.start, { deviceId: DEVICE, topic: "my neighbour was arrested" })).toEqual({ ok: false, reason: "not_allowed" });
+    expect(await t.action(api.commissions.start, { deviceId: DEVICE, topic: "my neighbour was arrested" })).toEqual({ ok: false, reason: "not_allowed", refusal: "private_person" });
+    expect(await t.action(api.commissions.start, { deviceId: DEVICE, topic: "a storm that killed three people" })).toEqual({ ok: false, reason: "not_allowed", refusal: "tragedy" });
+    expect(await t.action(api.commissions.start, { deviceId: DEVICE, topic: "Acme chief executive Jane Smith's affairs" })).toEqual({ ok: false, reason: "not_allowed", refusal: "private_life" });
+    expect(await t.action(api.commissions.start, { deviceId: DEVICE, link: AFFAIR_URL })).toEqual({ ok: false, reason: "not_allowed", refusal: "private_life" });
+    expect(await t.action(api.commissions.start, { deviceId: DEVICE, topic: "Acme chief executive Jane Smith is being investigated" })).toEqual({
+      ok: false,
+      reason: "not_allowed",
+      refusal: "needs_source",
+      message: "That one needs a source. Paste a link to the article and Robo will draw it.",
+    });
+    calls = [];
     expect(await t.action(api.commissions.start, { deviceId: DEVICE, topic: "x".repeat(141) })).toEqual({ ok: false, reason: "bad_input" });
     expect(await t.action(api.commissions.start, { deviceId: DEVICE })).toEqual({ ok: false, reason: "bad_input" });
     expect(await t.action(api.commissions.start, { deviceId: DEVICE, link: "ftp://example.com/a" })).toEqual({ ok: false, reason: "bad_input" });
     expect(calls).toHaveLength(0);
     expect(await t.run(async (ctx) => ctx.db.query("commissions").collect())).toHaveLength(0);
+  });
+
+  test("the same legal story passes as a link to an article, and the writer learns the publisher", async () => {
+    const t = convexTest(schema, modules);
+    const res = await t.action(api.commissions.start, { deviceId: DEVICE, link: INVESTIGATION_URL });
+    if (!res.ok) throw new Error(`start failed: ${JSON.stringify(res)}`);
+    const [row] = await t.run(async (ctx) => ctx.db.query("commissions").collect());
+    expect(row).toMatchObject({ link: INVESTIGATION_URL, headline: "Regulators investigate Acme chief executive Jane Smith" });
+    expect(row.facts).toContain("The article was published by Example News.");
   });
 
   test("a spent image cap is refused before checkout", async () => {

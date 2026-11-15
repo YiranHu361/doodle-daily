@@ -8,7 +8,7 @@ import { CutBox } from "../components/shapes";
 import { Robo } from "../robo/Robo";
 import { colors, cut, type } from "../theme";
 import { openCheckout, useBillingDevice } from "./hooks";
-import { commissionArgs, commissionLine, startFailMessage, TOPIC_MAX, type CommissionStatus } from "./logic";
+import { commissionArgs, commissionLine, refusalMessage, startFailMessage, TOPIC_MAX, type CommissionStatus } from "./logic";
 import { BillingSheet, PencilIcon, SheetHeader, SmallButton } from "./Sheet";
 
 const DONE: CommissionStatus[] = ["ready", "failed", "refunded"];
@@ -74,7 +74,7 @@ function CommissionSheet({
     try {
       const res = await start({ deviceId, ...commissionArgs(text) });
       if (!res.ok) {
-        setError(startFailMessage(res.reason));
+        setError(res.message ?? refusalMessage(res.refusal) ?? startFailMessage(res.reason));
         return;
       }
       onStarted(res.commissionId);

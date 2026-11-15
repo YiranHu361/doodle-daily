@@ -46,6 +46,23 @@ export function startFailMessage(reason: StartFailure): string {
   }
 }
 
+export type Refusal = "needs_source" | "private_life" | "tragedy" | "private_person";
+
+export function refusalMessage(refusal: Refusal | undefined): string | null {
+  switch (refusal) {
+    case "needs_source":
+      return "That one needs a source. Paste a link to the article and Robo will draw it.";
+    case "private_life":
+      return "Robo skips stories about people's private lives. Try another topic.";
+    case "tragedy":
+      return "Robo skips stories about crime and tragedy. Try another topic.";
+    case "private_person":
+      return "Robo only draws public figures, not private people. Try another topic.";
+    default:
+      return null;
+  }
+}
+
 export const PAPER_NAME_MAX = 30;
 export const PAPER_NICHE_MAX = 80;
 

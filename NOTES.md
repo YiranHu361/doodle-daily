@@ -179,6 +179,25 @@
   or background audio.
 
 
+## Content filter (owner change, 2026-11-15)
+
+- **Allowed now, with a source.** Business and legal news about public figures and companies (investigations,
+  lawsuits, charges, arrests, convictions, firings, resignations) passes the filter for feed stories and pasted
+  article links. When a comic is such a story, script validation makes every caption name the source (`X reports
+  ...` or `according to X`); with a `source` option it must name that exact source. `pipeline.ts` does not pass
+  `source` yet, so feed comics are held to the attribution form, not the exact outlet.
+- **Refused everywhere** (`storyRefusal` in `convex/lib/filter.ts`): `tragedy` (death, violence, war, disasters,
+  illness, abuse), `private_life` (sex, affairs, relationships, health, family of real people) and
+  `private_person` (neighbours, co-workers, "local man", private citizens). Checked in that order.
+- **Typed topics are unsourced.** A commission with no link that claims misconduct or legal trouble by a named
+  person or a role such as CEO gets `needs_source`. Companies, products, ideas, the reader's own life and public
+  figures' work are fine.
+- **`commissions:start` refusals** keep `reason: "not_allowed"` (the app's `startFailMessage` is typed to the old
+  list) and add `refusal`: `needs_source` | `private_life` | `tragedy` | `private_person`. `needs_source` also
+  carries `message`: That one needs a source. Paste a link to the article and Robo will draw it. A link commission
+  adds a fact naming the publisher (`og:site_name`, else the host) so the writer can name it.
+- **`isSafeStory`** is `storyRefusal(text, { sourced: true }) === null`, so paper names and niches
+  (`papers:create`) get the same looser rules.
 ## Thread 6 (polish and Revyl tests)
 
 - **Card to Reader flight** (`src/components/Flight.tsx`). Native-stack screens cannot share elements, so the
