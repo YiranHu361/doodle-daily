@@ -6,7 +6,7 @@ import { notifyBusy } from "../components/celebrationBridge";
 import type { Comic } from "../data/types";
 import { ShareCard } from "./ShareCard";
 
-type OnReady = (view: ComponentRef<typeof View>, size: { width: number; height: number }) => void;
+type OnReady = (view: ComponentRef<typeof View>) => void;
 
 export function useShare(onError: () => void): { share: () => void; sharing: boolean; onReady: OnReady } {
   const [sharing, setSharing] = useState(false);
@@ -15,12 +15,12 @@ export function useShare(onError: () => void): { share: () => void; sharing: boo
     errorRef.current = onError;
   });
 
-  const onReady = useCallback<OnReady>((view, size) => {
+  const onReady = useCallback<OnReady>((view) => {
     void (async () => {
       try {
-        const uri = await captureRef(view, { format: "png", result: "tmpfile", width: size.width, height: size.height, useRenderInContext: true });
+        const uri = await captureRef(view, { format: "jpg", quality: 0.92, result: "tmpfile", useRenderInContext: true });
         notifyBusy(true);
-        await Sharing.shareAsync(uri, { mimeType: "image/png", UTI: "public.png", dialogTitle: "Share this comic" });
+        await Sharing.shareAsync(uri, { mimeType: "image/jpeg", UTI: "public.jpeg", dialogTitle: "Share this comic" });
       } catch {
         errorRef.current();
       } finally {

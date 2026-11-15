@@ -41,6 +41,7 @@ export function CutBox({ cut, fill, stroke, strokeWidth = glowToken.stroke, dash
       {size.w > 0 ? (
         <Svg style={StyleSheet.absoluteFill} width={size.w} height={size.h} pointerEvents="none">
           <Path
+            key={dashed ? "dashed" : "solid"}
             d={cutPath(size.w, size.h, cut, sw / 2)}
             fill={fill ?? "none"}
             stroke={stroke ?? "none"}

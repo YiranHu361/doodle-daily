@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState, type ComponentRef } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { PixelRatio, StyleSheet, Text, View } from "react-native";
 import { PanelImage } from "../components/PanelImage";
 import type { Comic } from "../data/types";
 import { colors, fonts, sectionColor, sectionLabel } from "../theme";
 import { shareLayout } from "./layout";
 
-export const SHARE_LOGICAL_WIDTH = 360;
+
 const LATE_PANEL_WAIT_MS = 8_000;
 
-export function ShareCard({ comic, onReady }: { comic: Comic; onReady: (view: ComponentRef<typeof View>, size: { width: number; height: number }) => void }) {
+export function ShareCard({ comic, onReady }: { comic: Comic; onReady: (view: ComponentRef<typeof View>) => void }) {
   const layout = shareLayout(comic.panels.length);
-  const s = SHARE_LOGICAL_WIDTH / layout.width;
+  const logicalWidth = layout.width / PixelRatio.get();
+  const s = logicalWidth / layout.width;
   const ref = useRef<ComponentRef<typeof View>>(null);
   const [loaded, setLoaded] = useState<Set<number>>(() => new Set());
   const [expired, setExpired] = useState(false);
@@ -26,9 +27,9 @@ export function ShareCard({ comic, onReady }: { comic: Comic; onReady: (view: Co
     if (fired.current || !ref.current || !(allDrawn || expired)) return;
     fired.current = true;
     const view = ref.current;
-    const t = setTimeout(() => onReady(view, { width: layout.width, height: layout.height }), 120);
+    const t = setTimeout(() => onReady(view), 120);
     return () => clearTimeout(t);
-  }, [allDrawn, expired, onReady, layout.width, layout.height]);
+  }, [allDrawn, expired, onReady]);
 
   const panel = Math.round(layout.panelSize * s);
   return (
@@ -36,7 +37,7 @@ export function ShareCard({ comic, onReady }: { comic: Comic; onReady: (view: Co
       ref={ref}
       collapsable={false}
       pointerEvents="none"
-      style={[styles.card, { width: SHARE_LOGICAL_WIDTH, height: layout.height * s, padding: layout.padding * s }]}
+      style={[styles.card, { width: logicalWidth, height: layout.height * s, padding: layout.padding * s }]}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
