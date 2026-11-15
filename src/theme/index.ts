@@ -6,6 +6,7 @@ export const colors = {
   neon: { volt: "#FFE83D", cyan: "#2DE2FF", lime: "#7CFF6B", pink: "#FF4FB8", violet: "#A98BFF" },
   state: { error: "#FF5C7A" },
   paper: "#FBF7EC",
+  wordmark: { daily: "#D9F9FF" },
   ink: "#1B1736",
   stamp: "#C2185B",
   robo: { body: "#3D8BFF", shade: "#2A63D6", screen: "#0B0820", eyes: "#2DE2FF" },

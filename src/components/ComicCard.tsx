@@ -1,52 +1,108 @@
-import { Image } from "expo-image";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useWindowDimensions, Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
+import { panelsDrawn } from "../data/filter";
 import type { Comic } from "../data/types";
-import { colors, sectionColor, sectionLabel, space, type } from "../theme";
+import { copy } from "../theme/copy";
+import { colors, cut, sectionColor, sectionLabel, space, type } from "../theme";
+import { CutBox } from "./shapes";
+import { PaperSheet } from "./Paper";
+import { PanelImage, Scribble } from "./PanelImage";
+import { NewBadge, ReadStamp, SectionTag } from "./ui";
 
-function Cover({ uri, size, label }: { uri: string | null; size: number | "full"; label: string }) {
-  const box = size === "full" ? { width: "100%" as const, aspectRatio: 1 } : { width: size, height: size };
+export function ComicCard({
+  comic,
+  index,
+  lead,
+  read,
+  fresh,
+  onPress,
+}: {
+  comic: Comic;
+  index: number;
+  lead: boolean;
+  read: boolean;
+  fresh?: boolean;
+  onPress: () => void;
+}) {
+  const { width } = useWindowDimensions();
+  const color = sectionColor[comic.section];
+  const cover = comic.panels[0];
+  const ready = comic.status === "ready";
+  const drawing = !ready;
+  const drawn = panelsDrawn(comic);
+  const coverSize = lead ? width - space.margin * 2 - 24 - 16 : 96 - 12;
+  const sublabel = drawing ? `${copy.drawingCard}, ${copy.panelsOf(drawn)}` : "";
   return (
-    <View style={[styles.paper, box]}>
-      {uri ? (
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} accessibilityLabel={label} />
-      ) : (
-        <Text style={styles.scribble}>Sharpening crayons</Text>
-      )}
-    </View>
+    <Animated.View entering={FadeIn.duration(200)} layout={LinearTransition.duration(200)}>
+      <Pressable
+        testID={`comicCard_${index}`}
+        accessibilityRole="button"
+        accessibilityLabel={`${sectionLabel[comic.section]}: ${comic.title}${read ? ", read" : ""}${comic.isNew ? ", new" : ""}${sublabel ? `, ${sublabel}` : ""}`}
+        onPress={onPress}
+      >
+        <CutBox
+          cut={cut.card}
+          fill={colors.surface[1]}
+          stroke={drawing && fresh ? colors.neon.volt : lead ? color : colors.line.dim}
+          dashed={drawing && fresh}
+          glow={lead && ready ? color : null}
+          style={lead ? styles.lead : styles.row}
+        >
+          <PaperSheet backlight={color} seed={index + 3} padding={lead ? 8 : 6} backlightRadius={lead ? 16 : 8}>
+            <PanelImage uri={cover.imageUrl} size={coverSize} label={cover.scene || comic.title} placeholderLabel={copy.drawingCard} />
+          </PaperSheet>
+          <View style={lead ? styles.leadText : styles.rowText}>
+            <SectionTag section={comic.section} />
+            <Text style={lead ? styles.leadTitle : styles.rowTitle}>{comic.title}</Text>
+            {drawing ? (
+              <Text style={styles.meta}>
+                {copy.drawingCard} · {copy.panelsOf(drawn)}
+              </Text>
+            ) : null}
+          </View>
+          {read ? <ReadStamp /> : null}
+          {comic.isNew ? <NewBadge /> : null}
+        </CutBox>
+      </Pressable>
+    </Animated.View>
   );
 }
 
-function Tag({ section }: { section: Comic["section"] }) {
-  return <Text style={[styles.tag, { color: sectionColor[section] }]}>{sectionLabel[section].toUpperCase()}</Text>;
+export function DrawingCard() {
+  return (
+    <Animated.View entering={FadeIn.duration(200)} accessible accessibilityLabel={`${copy.drawingCard}, ${copy.panelsOf(0)}`}>
+      <CutBox cut={cut.card} fill={colors.surface[1]} stroke={colors.neon.volt} dashed style={styles.row}>
+        <PaperSheet seed={99} padding={6} backlight={colors.neon.volt} backlightRadius={8}>
+          <Scribble size={84} />
+        </PaperSheet>
+        <View style={styles.rowText}>
+          <Text style={styles.rowTitle}>{copy.drawingCard}</Text>
+          <Text style={styles.meta}>{copy.panelsOf(0)}</Text>
+        </View>
+      </CutBox>
+    </Animated.View>
+  );
 }
 
-export function ComicCard({ comic, index, onPress }: { comic: Comic; index: number; onPress?: () => void }) {
-  const lead = index === 0;
-  const cover = comic.panels[0];
+export function SkeletonCard({ lead }: { lead: boolean }) {
   return (
-    <Pressable
-      testID={`comicCard_${index}`}
-      accessibilityRole="button"
-      accessibilityLabel={`${sectionLabel[comic.section]}: ${comic.title}`}
-      onPress={onPress}
-      style={[lead ? styles.lead : styles.row, { borderColor: lead ? sectionColor[comic.section] : colors.line.dim }]}
-    >
-      <Cover uri={cover.imageUrl} size={lead ? "full" : 96} label={cover.scene} />
+    <CutBox cut={cut.card} fill={colors.surface[1]} stroke={colors.line.dim} style={lead ? styles.lead : styles.row}>
+      <View style={[styles.skel, lead ? { aspectRatio: 1, width: "100%" } : { width: 96, height: 96 }]} />
       <View style={lead ? styles.leadText : styles.rowText}>
-        <Tag section={comic.section} />
-        <Text style={styles.title}>{comic.title}</Text>
+        <View style={[styles.skel, { width: 70, height: 16 }]} />
+        <View style={[styles.skel, { width: "80%", height: 22 }]} />
       </View>
-    </Pressable>
+    </CutBox>
   );
 }
 
 const styles = StyleSheet.create({
-  lead: { backgroundColor: colors.surface[1], borderWidth: 1.5, padding: 12, gap: 12 },
-  row: { backgroundColor: colors.surface[1], borderWidth: 1, padding: 12, flexDirection: "row", gap: space.gap, alignItems: "center" },
-  leadText: { gap: 4 },
-  rowText: { flex: 1, gap: 4 },
-  paper: { backgroundColor: colors.paper, overflow: "hidden", justifyContent: "center", alignItems: "center" },
-  scribble: { ...type.meta, color: colors.ink },
-  tag: { ...type.chip },
-  title: { ...type.title, color: colors.text.hi },
+  lead: { padding: 12, gap: 14 },
+  row: { padding: 10, flexDirection: "row", gap: 14, alignItems: "center" },
+  leadText: { gap: 8, paddingBottom: 4 },
+  rowText: { flex: 1, gap: 6 },
+  leadTitle: { ...type.title, color: colors.text.hi },
+  rowTitle: { ...type.title, fontSize: 19, lineHeight: 24, color: colors.text.hi },
+  meta: { ...type.meta, color: colors.text.low },
+  skel: { backgroundColor: colors.surface[2] },
 });

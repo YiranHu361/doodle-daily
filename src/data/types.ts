@@ -26,3 +26,18 @@ export type Edition = {
   status: "building" | "published";
   comics: Comic[];
 };
+
+export type EditionSummary = {
+  _id: string;
+  date: string;
+  number: number;
+  status: "building" | "published";
+  comicCount: number;
+  coverUrl: string | null;
+  locked: boolean;
+};
+
+export type ReactionCounts = { lol: number; wow: number; yikes: number; mine: ReactionKind | null };
+
+export type DrawReason = "bad_secret" | "no_story" | "spend_cap" | "busy" | "needs_plus";
+export type DrawResult = { ok: true; comicId: string } | { ok: false; reason: DrawReason };
