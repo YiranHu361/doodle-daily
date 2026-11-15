@@ -92,7 +92,12 @@
   6-comic yesterday, one locked back issue, local 192 px pictures, in-memory
   reactions, and a simulated "Draw a fresh one" that fills in panel by panel.
 - **`pipeline:drawFreshOne`** gets the demo secret from `EXPO_PUBLIC_DEMO_SECRET` at build time;
-  a build without it gets `bad_secret`, shown as "My crayon snapped. Try again."
+  a build without it gets `bad_secret`, shown as "My crayon snapped. Try again." To build with
+  it, write it to a git-excluded env file just for the build and delete it afterwards, never
+  committing or printing it. `.capyignore` drops `.env*.local` from Revyl archives, so use
+  `.env.production` (add it to `.git/info/exclude`):
+  `printf 'EXPO_PUBLIC_DEMO_SECRET=%s\n' "$(npx convex env get DEMO_SECRET)" > .env.production`,
+  then in the build `set -a && . ./.env.production && set +a` before `xcodebuild`.
 - **`editions:list` / `editions:byDate`** are called without `deviceId` (the deployed
   validators reject extra args). Thread 5 should add it in `src/data/hooks.ts` when the
   server accepts it; the app already decodes and honours `locked`.
