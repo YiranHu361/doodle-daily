@@ -112,9 +112,10 @@ revyl test run read-and-clear-the-day
 | [#9](https://github.com/yiranhu361/doodle-daily/pull/9) | Phone checks on main and the demo-secret build recipe |
 | [#10](https://github.com/yiranhu361/doodle-daily/pull/10) | Whop payments: Create a comic, Plus, combo pays for Plus, Start your own paper |
 | [#12](https://github.com/yiranhu361/doodle-daily/pull/12) | Revyl tests and this README |
-
-The Keiki iMessage thread (Text Newsie) is still running and adds its own pull
-request.
+| [#13](https://github.com/yiranhu361/doodle-daily/pull/13) | Keep the billing sheet above the keyboard on iOS |
+| [#14](https://github.com/yiranhu361/doodle-daily/pull/14) | Loosen the story filter: allow sourced business and legal news, refusal reasons |
+| [#15](https://github.com/yiranhu361/doodle-daily/pull/15) | Text Newsie a link (Keiki) |
+| [#16](https://github.com/yiranhu361/doodle-daily/pull/16) | Polish: card to Reader flight, celebration, launch, icon, Create wording, phone-tested flows |
 
 ## Layout
 
