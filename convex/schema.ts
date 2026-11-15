@@ -93,6 +93,8 @@ export default defineSchema({
     createdAt: v.number(),
     deadline: v.number(),
     panels: v.array(panel),
+    panelAudioIds: v.optional(v.array(v.union(v.id("_storage"), v.null()))),
+    realStoryAudioId: v.optional(v.id("_storage")),
   })
     .index("by_edition_order", ["editionId", "order"])
     .index("by_status_deadline", ["status", "deadline"]),

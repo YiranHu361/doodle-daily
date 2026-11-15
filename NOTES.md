@@ -92,7 +92,12 @@
   6-comic yesterday, one locked back issue, local 192 px pictures, in-memory
   reactions, and a simulated "Draw a fresh one" that fills in panel by panel.
 - **`pipeline:drawFreshOne`** gets the demo secret from `EXPO_PUBLIC_DEMO_SECRET` at build time;
-  a build without it gets `bad_secret`, shown as "My crayon snapped. Try again."
+  a build without it gets `bad_secret`, shown as "My crayon snapped. Try again." To build with
+  it, write it to a git-excluded env file just for the build and delete it afterwards, never
+  committing or printing it. `.capyignore` drops `.env*.local` from Revyl archives, so use
+  `.env.production` (add it to `.git/info/exclude`):
+  `printf 'EXPO_PUBLIC_DEMO_SECRET=%s\n' "$(npx convex env get DEMO_SECRET)" > .env.production`,
+  then in the build `set -a && . ./.env.production && set +a` before `xcodebuild`.
 - **`editions:list` / `editions:byDate`** are called without `deviceId` (the deployed
   validators reject extra args). Thread 5 should add it in `src/data/hooks.ts` when the
   server accepts it; the app already decodes and honours `locked`.
@@ -147,3 +152,29 @@
   replaces every function and the schema, so deploy a merge of the open branches (the voice thread's
   schema adds fields to `comics`).
 - **Waitlist dropped.** "Start your own paper" replaces the pitch screen and `waitlist:join`.
+
+## Thread 7 (voice)
+
+- **Model.** `gpt-4o-mini-tts` (alias of `gpt-4o-mini-tts-2025-12-15`) on `POST /v1/audio/speech`, voice
+  `cedar`, `response_format: "mp3"`, delivery in the `instructions` field (base Newsie voice plus one line per
+  section). OpenAI's docs mark every `/v1/audio/speech` model deprecated, shutting down **2027-01-06**; the
+  replacement (`gpt-realtime-2.1-mini`) only works through the Realtime API, so narration needs a rewrite
+  before then.
+- **Schema.** Only two optional fields on `comics`: `panelAudioIds` (4 entries, null where missing) and
+  `realStoryAudioId`.
+- **Cap and lock without new tables.** Each `voice:ensure` that makes clips writes a `runs` row (`kind: "voice"`)
+  whose note is JSON `{ comicId, clips }`; `clips` is reserved up front and lowered to the clips actually made
+  when the run finishes. `DAILY_VOICE_CAP` (default 400) is checked against the sum for the Pacific day. The
+  lock is a `locks` row named `voice:{comicId}` with a 3 minute expiry; a second caller gets
+  `{ ok: true, status: "busy" }` and the live query delivers the clips.
+- **`voice:ensure` returns** `{ ok: true, status: "ready" | "partial" | "busy" } | { ok: false, reason:
+  "not_found" | "voice_cap" | "unavailable" }` (`unavailable` = no `OPENAI_API_KEY`). Each clip: 30 s timeout,
+  at most 2 retries (1 s, then 3 s, or Retry-After up to 10 s); quota errors are not retried.
+- **Live run (2026-11-15, issue 2, "Dinner Is Served, Rocket Style").** 5 clips in 4.6 s, all `audio/mpeg`,
+  4.3 / 3.8 / 6.2 / 6.0 s per caption and 15.4 s for the Real story (35.6 s, 570 KB). At OpenAI's estimate of
+  about $0.015 per minute of speech that is about **$0.01 per comic**; a full 400-clip day is roughly $1.
+- **App.** `useNarration` stays quiet while VoiceOver runs, while the celebration shows, and in fixture mode.
+  The setting lives in AsyncStorage under `dd.voice.v1` and is cleared by the reset flag. The silent switch is
+  respected (`playsInSilentMode: false`). The `expo-audio` plugin is configured without microphone permission
+  or background audio.
+
