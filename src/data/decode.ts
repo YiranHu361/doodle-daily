@@ -1,8 +1,21 @@
-import type { Comic, ComicStatus, Edition, Panel, Section } from "./types";
+import type {
+  Comic,
+  ComicStatus,
+  DrawReason,
+  DrawResult,
+  Edition,
+  EditionSummary,
+  Panel,
+  ReactionCounts,
+  ReactionKind,
+  Section,
+} from "./types";
 
 const SECTIONS: readonly Section[] = ["tech", "money", "culture", "memes"];
 const STATUSES: readonly ComicStatus[] = ["scripted", "drawing", "ready"];
 const KINDS: readonly Comic["kind"][] = ["news", "meme", "commission"];
+const REACTIONS: readonly ReactionKind[] = ["lol", "wow", "yikes"];
+const DRAW_REASONS: readonly DrawReason[] = ["bad_secret", "no_story", "spend_cap", "busy", "needs_plus"];
 
 type Obj = Record<string, unknown>;
 
@@ -60,4 +73,50 @@ export function decodeEdition(raw: unknown): Edition | null {
     .filter((c): c is Comic => c !== null)
     .sort((a, b) => a.order - b.order);
   return { _id, date, number, status: raw.status === "building" ? "building" : "published", comics };
+}
+
+function decodeSummary(raw: unknown): EditionSummary | null {
+  if (!isObj(raw)) return null;
+  const _id = str(raw._id);
+  const date = str(raw.date);
+  const number = num(raw.number);
+  if (!_id || !date || number === null) return null;
+  return {
+    _id,
+    date,
+    number,
+    status: raw.status === "building" ? "building" : "published",
+    comicCount: num(raw.comicCount) ?? 0,
+    coverUrl: str(raw.coverUrl),
+    locked: raw.locked === true,
+  };
+}
+
+export function decodeSummaries(raw: unknown): EditionSummary[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(decodeSummary)
+    .filter((s): s is EditionSummary => s !== null)
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.number - a.number));
+}
+
+export function decodeCounts(raw: unknown): ReactionCounts | null {
+  if (!isObj(raw)) return null;
+  const mine = str(raw.mine) as ReactionKind | null;
+  return {
+    lol: Math.max(0, num(raw.lol) ?? 0),
+    wow: Math.max(0, num(raw.wow) ?? 0),
+    yikes: Math.max(0, num(raw.yikes) ?? 0),
+    mine: mine && REACTIONS.includes(mine) ? mine : null,
+  };
+}
+
+export function decodeDrawResult(raw: unknown): DrawResult | null {
+  if (!isObj(raw)) return null;
+  if (raw.ok === true) {
+    const comicId = str(raw.comicId);
+    return comicId ? { ok: true, comicId } : null;
+  }
+  const reason = str(raw.reason) as DrawReason | null;
+  return raw.ok === false && reason && DRAW_REASONS.includes(reason) ? { ok: false, reason } : null;
 }

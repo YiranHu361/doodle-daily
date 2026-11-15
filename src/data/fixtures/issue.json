@@ -1,0 +1,383 @@
+{
+  "_id": "fixture-edition-today",
+  "number": 3,
+  "status": "published",
+  "comics": [
+    {
+      "_id": "fixture-comic-0",
+      "section": "tech",
+      "kind": "news",
+      "title": "Robot vacuum maps the office",
+      "realStory": "A sample office let its robot vacuum map the floor overnight. The map was perfect and the robot settled under the snack table.",
+      "sourceName": "Doodle Daily sample desk",
+      "sourceUrl": "https://example.com/sample/robot-vacuum-maps-the-office",
+      "status": "ready",
+      "order": 0,
+      "createdAt": 1700000000000,
+      "isNew": false,
+      "panels": [
+        {
+          "scene": "Robo rolls across a big office floor at night with a tiny lamp on its head.",
+          "caption": "An office let its robot vacuum map the whole floor overnight.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:0"
+        },
+        {
+          "scene": "Robo draws lines on a huge paper map while The Crowd sleeps at desks.",
+          "caption": "It measured every desk, chair and cable on the way.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:1"
+        },
+        {
+          "scene": "Robo proudly holds up a giant finished map with a gold star.",
+          "caption": "By morning the map was perfect, down to the last stapler.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:2"
+        },
+        {
+          "scene": "Robo naps under a table piled with snacks, crumbs everywhere.",
+          "caption": "Then it parked under the snack table and refused to leave.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:3"
+        }
+      ]
+    },
+    {
+      "_id": "fixture-comic-1",
+      "section": "money",
+      "kind": "news",
+      "title": "Coffee costs a dime more",
+      "realStory": "Sample cafes raised the price of a small coffee by ten cents this week. Regulars kept buying and asked for larger cups.",
+      "sourceName": "Doodle Daily sample desk",
+      "sourceUrl": "https://example.com/sample/coffee-costs-a-dime-more",
+      "status": "ready",
+      "order": 1,
+      "createdAt": 1700000000001,
+      "isNew": false,
+      "panels": [
+        {
+          "scene": "Coin stands at a cafe counter looking at a tiny paper cup.",
+          "caption": "Cafes nudged the price of a small coffee up by ten cents.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:1"
+        },
+        {
+          "scene": "Coin counts a pile of small coins on the counter, sweating.",
+          "caption": "It is the second small bump this season.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:2"
+        },
+        {
+          "scene": "The Crowd lines up anyway, each holding a mug.",
+          "caption": "Regulars kept ordering like nothing happened.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:3"
+        },
+        {
+          "scene": "Coin hands over a bucket-sized cup with a big smile.",
+          "caption": "Their one request: bigger cups for the money.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:4"
+        }
+      ]
+    },
+    {
+      "_id": "fixture-comic-2",
+      "section": "culture",
+      "kind": "news",
+      "title": "The choir gets kazoos",
+      "realStory": "A sample town choir added a kazoo section and twelve volunteers joined. Its spring concert will include a kazoo solo.",
+      "sourceName": "Doodle Daily sample desk",
+      "sourceUrl": "https://example.com/sample/the-choir-gets-kazoos",
+      "status": "ready",
+      "order": 2,
+      "createdAt": 1700000000002,
+      "isNew": false,
+      "panels": [
+        {
+          "scene": "Newsie stands on a stage in front of three music stands.",
+          "caption": "A town choir announced a brand new kazoo section.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:2"
+        },
+        {
+          "scene": "The Crowd holds tiny kazoos, cheeks puffed out.",
+          "caption": "Twelve volunteers signed up on the first night.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:3"
+        },
+        {
+          "scene": "Boss Blob covers its ears while musical notes fly around.",
+          "caption": "The first rehearsal was loud and very enthusiastic.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:4"
+        },
+        {
+          "scene": "The Crowd and Newsie bow while flowers land on the stage.",
+          "caption": "The spring concert will feature a kazoo solo.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:5"
+        }
+      ]
+    },
+    {
+      "_id": "fixture-comic-3",
+      "section": "memes",
+      "kind": "meme",
+      "title": "Everyone is a sourdough expert",
+      "realStory": "A wave of posts about naming sourdough starters is going around.",
+      "sourceName": "Doodle Daily sample desk",
+      "sourceUrl": "https://example.com/sample/everyone-is-a-sourdough-expert",
+      "status": "ready",
+      "order": 3,
+      "createdAt": 1700000000003,
+      "isNew": false,
+      "panels": [
+        {
+          "scene": "The Crowd stares at a jar of bubbling dough on a kitchen table.",
+          "caption": "This week the internet decided to bake bread again.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:3"
+        },
+        {
+          "scene": "Newsie feeds the jar with a tiny spoon while The Crowd watches.",
+          "caption": "Everyone is naming their starter like a pet.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:4"
+        },
+        {
+          "scene": "The jar overflows and dough creeps across the table.",
+          "caption": "The starters are growing faster than the jokes.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:5"
+        },
+        {
+          "scene": "The Crowd sits around a huge loaf with a party hat on it.",
+          "caption": "Today the bread is the main character.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:6"
+        }
+      ]
+    },
+    {
+      "_id": "fixture-comic-4",
+      "section": "tech",
+      "kind": "news",
+      "title": "Phones learn to nap",
+      "realStory": "A sample phone update adds a twenty minute quiet mode. Testers ended up using it every afternoon.",
+      "sourceName": "Doodle Daily sample desk",
+      "sourceUrl": "https://example.com/sample/phones-learn-to-nap",
+      "status": "ready",
+      "order": 4,
+      "createdAt": 1700000000004,
+      "isNew": false,
+      "panels": [
+        {
+          "scene": "Robo holds a big phone that wears a sleeping mask.",
+          "caption": "A sample phone update adds a mode that silences everything for 20 minutes.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:4"
+        },
+        {
+          "scene": "The Crowd taps their phones, which all show a moon.",
+          "caption": "Testers said the quiet felt strange at first.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:5"
+        },
+        {
+          "scene": "Newsie snores on a pillow next to a phone.",
+          "caption": "Then they started using it every afternoon.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:6"
+        },
+        {
+          "scene": "Robo tucks the phone into a tiny bed with a blanket.",
+          "caption": "The phone, apparently, also needed the rest.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:7"
+        }
+      ]
+    },
+    {
+      "_id": "fixture-comic-5",
+      "section": "money",
+      "kind": "news",
+      "title": "Piggy banks are back",
+      "realStory": "A sample toy store sold out of piggy banks as kids wanted to watch their savings grow. More are on order for the holidays.",
+      "sourceName": "Doodle Daily sample desk",
+      "sourceUrl": "https://example.com/sample/piggy-banks-are-back",
+      "status": "ready",
+      "order": 5,
+      "createdAt": 1700000000005,
+      "isNew": false,
+      "panels": [
+        {
+          "scene": "Coin walks past a shop window full of piggy banks.",
+          "caption": "A sample toy store sold out of piggy banks in a week.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:5"
+        },
+        {
+          "scene": "The Crowd carries piggy banks home under their arms.",
+          "caption": "Parents said kids wanted to see their savings grow.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:6"
+        },
+        {
+          "scene": "Coin jumps into a piggy bank with a splash of coins.",
+          "caption": "Shops ordered more for the holidays.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:7"
+        },
+        {
+          "scene": "Boss Blob shakes an empty piggy bank, looking puzzled.",
+          "caption": "Some grown-ups bought one for themselves too.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:0"
+        }
+      ]
+    },
+    {
+      "_id": "fixture-comic-6",
+      "section": "culture",
+      "kind": "news",
+      "title": "Library lends out umbrellas",
+      "realStory": "A sample library started lending umbrellas with a library card. All forty umbrellas from the first rainy day came back.",
+      "sourceName": "Doodle Daily sample desk",
+      "sourceUrl": "https://example.com/sample/library-lends-out-umbrellas",
+      "status": "ready",
+      "order": 6,
+      "createdAt": 1700000000006,
+      "isNew": false,
+      "panels": [
+        {
+          "scene": "Newsie stands under a library roof watching rain pour down.",
+          "caption": "A sample library now lends umbrellas like books.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:6"
+        },
+        {
+          "scene": "The Crowd checks out umbrellas at a desk with a stamp.",
+          "caption": "You borrow one with your library card.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:7"
+        },
+        {
+          "scene": "The Crowd walks home under three bright umbrellas.",
+          "caption": "Forty umbrellas went out on the first rainy day.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:0"
+        },
+        {
+          "scene": "A tall stack of returned umbrellas drips by the door.",
+          "caption": "Every single one came back.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:1"
+        }
+      ]
+    },
+    {
+      "_id": "fixture-comic-7",
+      "section": "memes",
+      "kind": "meme",
+      "title": "Cats versus boxes, again",
+      "realStory": "A running joke compares expensive pet beds to the cardboard boxes pets actually prefer.",
+      "sourceName": "Doodle Daily sample desk",
+      "sourceUrl": "https://example.com/sample/cats-versus-boxes-again",
+      "status": "ready",
+      "order": 7,
+      "createdAt": 1700000000007,
+      "isNew": false,
+      "panels": [
+        {
+          "scene": "Robo holds out a fancy cushion while a box sits on the floor.",
+          "caption": "The internet is comparing fancy pet beds with empty boxes.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:7"
+        },
+        {
+          "scene": "The Crowd points at the box and cheers.",
+          "caption": "The box is winning by a lot.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:0"
+        },
+        {
+          "scene": "Coin tries to sell the cushion to nobody.",
+          "caption": "The expensive bed is getting no votes.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:1"
+        },
+        {
+          "scene": "Robo sits inside the box, looking very pleased.",
+          "caption": "Even Robo picked the box.",
+          "cast": [
+            "Robo"
+          ],
+          "imageUrl": "fixture:2"
+        }
+      ]
+    }
+  ]
+}
