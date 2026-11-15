@@ -10,6 +10,7 @@ import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { FlightHost } from "../src/components/Flight";
 import { ToastProvider } from "../src/components/Toast";
 import { convex } from "../src/data/convex";
 import { getDeviceId } from "../src/data/deviceId";
@@ -79,6 +80,7 @@ export default function RootLayout() {
               <Stack.Screen name="archive/index" />
               <Stack.Screen name="archive/[date]" />
             </Stack>
+            <FlightHost />
             {introDone ? <CelebrationHost /> : <Intro onDone={onIntroDone} />}
           </ToastProvider>
         </SafeAreaProvider>

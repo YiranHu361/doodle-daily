@@ -17,6 +17,7 @@ import Animated, {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useReducedMotion } from "../../src/components/a11y";
 import { GridBackground } from "../../src/components/GridBackground";
+import { flyBack, landFlight, measure, useFlightCover, type ViewRef } from "../../src/components/Flight";
 import { CloseIcon, CompassIcon, ShareIcon } from "../../src/components/icons";
 import { PaperSheet } from "../../src/components/Paper";
 import { PanelImage } from "../../src/components/PanelImage";
@@ -39,21 +40,46 @@ import { SpeakerButton, useNarration, useVoiceSetting } from "../../src/voice";
 const PAGES = 5;
 
 function PanelPage({
+  comicId,
   panel,
   index,
   width,
   height,
   color,
   scrollX,
+  onPicture,
 }: {
+  comicId: string;
   panel: Panel;
   index: number;
   width: number;
   height: number;
   color: string;
   scrollX: SharedValue<number>;
+  onPicture?: (view: ViewRef | null) => void;
 }) {
+  const pictureRef = useRef<ViewRef>(null);
+  const setPicture = useCallback(
+    (view: ViewRef | null) => {
+      pictureRef.current = view;
+      onPicture?.(view);
+    },
+    [onPicture],
+  );
   const reduce = useReducedMotion();
+  const covered = useFlightCover(comicId) && index === 0;
+  const [flewIn] = useState(covered);
+  const captionIn = useSharedValue(flewIn ? 0 : 1);
+  useEffect(() => {
+    if (!covered) captionIn.set(withTiming(1, { duration: 220 }));
+  }, [covered, captionIn]);
+  const captionAnim = useAnimatedStyle(() => ({ opacity: captionIn.value }));
+  const onPictureLayout = () => {
+    if (!covered) return;
+    requestAnimationFrame(() => {
+      void measure(pictureRef.current).then((rect) => rect && landFlight(comicId, rect));
+    });
+  };
   const sheet = Math.max(160, Math.min(width - space.margin * 2, height - 120));
   const picture = sheet - 20;
   const anim = useAnimatedStyle(() => {
@@ -71,10 +97,12 @@ function PanelPage({
     <View style={[styles.page, { width }]}>
       <Animated.View style={anim}>
         <PaperSheet backlight={color} seed={index + 11} padding={10} style={{ width: sheet }}>
-          <PanelImage testID={`panel_${index}`} uri={panel.imageUrl} size={picture} label={panel.scene || `Panel ${index + 1}`} placeholderLabel={copy.drawingCard} />
-          <Text testID={`panelCaption_${index}`} style={styles.caption} minimumFontScale={1}>
+          <View ref={setPicture} collapsable={false} onLayout={onPictureLayout} style={covered ? styles.hidden : null}>
+            <PanelImage testID={`panel_${index}`} uri={panel.imageUrl} size={picture} label={panel.scene || `Panel ${index + 1}`} placeholderLabel={copy.drawingCard} />
+          </View>
+          <Animated.Text testID={`panelCaption_${index}`} style={[styles.caption, captionAnim]} minimumFontScale={1}>
             {panel.caption}
-          </Text>
+          </Animated.Text>
         </PaperSheet>
       </Animated.View>
     </View>
@@ -133,6 +161,8 @@ function ReaderView({ comic }: { comic: Comic }) {
   useNarration(comic._id, page, useVoiceSetting().on);
   const [pageHeight, setPageHeight] = useState(0);
   const scrollRef = useRef<Animated.ScrollView>(null);
+  const [firstPicture, setFirstPicture] = useState<ViewRef | null>(null);
+  const [flewIn] = useState(useFlightCover(comic._id));
   const scrollX = useSharedValue(0);
   const pull = useSharedValue(0);
   const enter = useSharedValue(0);
@@ -176,11 +206,16 @@ function ReaderView({ comic }: { comic: Comic }) {
   });
   const onMomentumEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => goTo(Math.round(e.nativeEvent.contentOffset.x / width));
 
-  const close = useCallback(() => {
+  const close = useCallback(async () => {
+    if (page === 0 && !reduce) {
+      const rect = await measure(firstPicture);
+      if (rect) flyBack(comic._id, rect);
+    }
     if (router.canGoBack()) router.back();
     else router.replace("/");
-  }, []);
+  }, [page, reduce, comic._id, firstPicture]);
 
+  const closeNow = () => void close();
   const pullDown = Gesture.Pan()
     .activeOffsetY(12)
     .failOffsetX([-20, 20])
@@ -188,13 +223,13 @@ function ReaderView({ comic }: { comic: Comic }) {
       pull.set(Math.max(0, e.translationY));
     })
     .onEnd((e) => {
-      if (e.translationY > 110 || e.velocityY > 900) runOnJS(close)();
+      if (e.translationY > 110 || e.velocityY > 900) runOnJS(closeNow)();
       else pull.set(withSpring(0, springs.snappy));
     });
 
   const screenAnim = useAnimatedStyle(() => ({
     opacity: enter.value * interpolate(pull.value, [0, 300], [1, 0.6], "clamp"),
-    transform: [{ translateY: pull.value }, { scale: reduce ? 1 : interpolate(enter.value, [0, 1], [0.94, 1]) }],
+    transform: [{ translateY: pull.value }, { scale: reduce || flewIn ? 1 : interpolate(enter.value, [0, 1], [0.94, 1]) }],
   }));
 
   const openSource = useCallback(async () => {
@@ -218,7 +253,7 @@ function ReaderView({ comic }: { comic: Comic }) {
           <GestureDetector gesture={pullDown}>
             <View style={styles.top} testID="readerTop">
               <View style={styles.topBar}>
-                <CutButton testID="closeReader" accessibilityLabel="Close" onPress={close} cut={cut.chip} fill={colors.surface[2]} stroke={colors.line.dim} boxStyle={styles.close}>
+                <CutButton testID="closeReader" accessibilityLabel="Close" onPress={closeNow} cut={cut.chip} fill={colors.surface[2]} stroke={colors.line.dim} boxStyle={styles.close}>
                   <CloseIcon />
                 </CutButton>
                 <ProgressPips page={page} seen={seen} color={color} />
@@ -246,7 +281,7 @@ function ReaderView({ comic }: { comic: Comic }) {
                 testID="readerPager"
               >
                 {comic.panels.map((p, i) => (
-                  <PanelPage key={i} panel={p} index={i} width={width} height={pageHeight} color={color} scrollX={scrollX} />
+                  <PanelPage key={i} comicId={comic._id} panel={p} index={i} width={width} height={pageHeight} color={color} scrollX={scrollX} onPicture={i === 0 ? setFirstPicture : undefined} />
                 ))}
                 <RealStoryPage comic={comic} width={width} read={read} onJump={jump} onOpenSource={openSource} />
               </Animated.ScrollView>
@@ -313,4 +348,5 @@ const styles = StyleSheet.create({
   sourceName: { ...type.button, color: colors.text.hi },
   bottomBar: { flexDirection: "row", gap: 8, paddingHorizontal: space.margin, paddingTop: 8, paddingBottom: 8 },
   shareBox: { width: 52, minHeight: 48 },
+  hidden: { opacity: 0 },
 });

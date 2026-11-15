@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import { useCallback, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { ChipRow } from "../src/components/ChipRow";
@@ -12,6 +12,7 @@ import { CutBox } from "../src/components/shapes";
 import { SkeletonList } from "../src/components/Skeleton";
 import { EmptyState, ErrorBoundary, ErrorState } from "../src/components/States";
 import { useToast } from "../src/components/Toast";
+import { useReducedMotion } from "../src/components/a11y";
 import { Banner, SecondaryButton } from "../src/components/ui";
 import { ComboFreeze, PapersShelf, PaywallSheet, usePlus } from "../src/billing";
 import { now, formatIssueDate, pacificDate } from "../src/data/clock";
@@ -78,6 +79,10 @@ function TodayScreen() {
   const [paywall, setPaywall] = useState(false);
   const [papers, setPapers] = useState(false);
   const [, setRetry] = useState(0);
+  const reduce = useReducedMotion();
+  const scroller = useRef<ScrollViewInstance>(null);
+  const [chipY, setChipY] = useState(0);
+  const known = useRef<Set<string> | null>(null);
   const edition = today.kind === "ready" ? today.data : null;
   const comics = useMemo(() => edition?.comics ?? [], [edition]);
 
@@ -104,6 +109,17 @@ function TodayScreen() {
   const visible = useMemo(() => filterComics(orderForToday(comics, freshId), chip), [comics, freshId, chip]);
   const drawingCount = stillDrawing(comics);
   const olderIssue = edition !== null && edition.date < pacificDate(now());
+
+  useEffect(() => {
+    const prev = known.current;
+    if (comics.length > 0) known.current = new Set(comics.map((c) => c._id));
+    if (!prev) return;
+    if (comics.some((c) => !prev.has(c._id) && (c.isNew || c.kind === "commission"))) scroller.current?.scrollTo({ y: chipY, animated: !reduce });
+  }, [comics, chipY, reduce]);
+
+  useEffect(() => {
+    if (draw.state.phase === "requesting") scroller.current?.scrollTo({ y: chipY, animated: !reduce });
+  }, [draw.state.phase, chipY, reduce]);
 
   const open = (c: Comic) => router.push({ pathname: "/reader/[comicId]", params: { comicId: c._id } });
   void combo;
@@ -146,9 +162,11 @@ function TodayScreen() {
     <View style={styles.screen}>
       <GridBackground />
       <SafeAreaView style={styles.flex} edges={["top"]}>
-        <ScrollView testID="todayList" stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: DOCK_HEIGHT + 56 }}>
+        <ScrollView ref={scroller} testID="todayList" stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: DOCK_HEIGHT + 56 }}>
           <Masthead edition={edition} onCombo={() => setSheet(true)} onPlus={() => setPaywall(true)} />
-          <ChipRow value={chip} onChange={setChip} />
+          <View onLayout={(e) => setChipY(e.nativeEvent.layout.y)}>
+            <ChipRow value={chip} onChange={setChip} />
+          </View>
           <View style={styles.content}>{body}</View>
         </ScrollView>
       </SafeAreaView>
