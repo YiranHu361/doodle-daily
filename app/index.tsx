@@ -13,6 +13,8 @@ import { SkeletonList } from "../src/components/Skeleton";
 import { EmptyState, ErrorBoundary, ErrorState } from "../src/components/States";
 import { useToast } from "../src/components/Toast";
 import { useReducedMotion } from "../src/components/a11y";
+import { useLaunchSequence } from "../src/components/launch";
+import Animated from "react-native-reanimated";
 import { Banner, SecondaryButton } from "../src/components/ui";
 import { ComboFreeze, PapersShelf, PaywallSheet, usePlus } from "../src/billing";
 import { now, formatIssueDate, pacificDate } from "../src/data/clock";
@@ -27,7 +29,9 @@ import { ComboPill, ComboSheet } from "../src/streak/ui";
 import { colors, cut, space, type } from "../src/theme";
 import { copy } from "../src/theme/copy";
 
-function Masthead({ edition, onCombo, onPlus }: { edition: Edition | null; onCombo: () => void; onPlus: () => void }) {
+type LaunchStyles = ReturnType<typeof useLaunchSequence>;
+
+function Masthead({ edition, onCombo, onPlus, launch }: { edition: Edition | null; onCombo: () => void; onPlus: () => void; launch: LaunchStyles }) {
   const { plus } = usePlus();
   return (
     <View style={styles.masthead}>
@@ -49,7 +53,7 @@ function Masthead({ edition, onCombo, onPlus }: { edition: Edition | null; onCom
             </Pressable>
           ) : null}
         </View>
-        <View accessible accessibilityRole="header" accessibilityLabel="Doodle Daily" testID="wordmark">
+        <Animated.View accessible accessibilityRole="header" accessibilityLabel="Doodle Daily" testID="wordmark" style={launch.wordmark}>
           <Text style={styles.doodle} maxFontSizeMultiplier={1.2}>
             DOODLE
           </Text>
@@ -59,11 +63,13 @@ function Masthead({ edition, onCombo, onPlus }: { edition: Edition | null; onCom
           <Text style={styles.daily} maxFontSizeMultiplier={1.2}>
             DAILY
           </Text>
-        </View>
+        </Animated.View>
       </View>
       <View style={styles.mastRight}>
         <ComboPill onPress={onCombo} />
-        <Robo pose="idle" size={84} />
+        <Animated.View style={launch.robo}>
+          <Robo pose="idle" size={84} />
+        </Animated.View>
       </View>
     </View>
   );
@@ -80,6 +86,7 @@ function TodayScreen() {
   const [papers, setPapers] = useState(false);
   const [, setRetry] = useState(0);
   const reduce = useReducedMotion();
+  const launch = useLaunchSequence();
   const scroller = useRef<ScrollViewInstance>(null);
   const [chipY, setChipY] = useState(0);
   const known = useRef<Set<string> | null>(null);
@@ -160,17 +167,21 @@ function TodayScreen() {
 
   return (
     <View style={styles.screen}>
-      <GridBackground />
+      <Animated.View style={[StyleSheet.absoluteFill, launch.grid]}>
+        <GridBackground />
+      </Animated.View>
       <SafeAreaView style={styles.flex} edges={["top"]}>
         <ScrollView ref={scroller} testID="todayList" stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: DOCK_HEIGHT + 56 }}>
-          <Masthead edition={edition} onCombo={() => setSheet(true)} onPlus={() => setPaywall(true)} />
+          <Masthead edition={edition} onCombo={() => setSheet(true)} onPlus={() => setPaywall(true)} launch={launch} />
           <View onLayout={(e) => setChipY(e.nativeEvent.layout.y)}>
             <ChipRow value={chip} onChange={setChip} />
           </View>
           <View style={styles.content}>{body}</View>
         </ScrollView>
       </SafeAreaView>
-      <Dock ref={dock} busy={draw.busy} onDraw={draw.start} />
+      <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, launch.dock]}>
+        <Dock ref={dock} busy={draw.busy} onDraw={draw.start} />
+      </Animated.View>
       <ComboSheet visible={sheet} onClose={() => setSheet(false)} />
       <PaywallSheet
         visible={paywall}
