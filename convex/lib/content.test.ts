@@ -104,7 +104,14 @@ describe("story filter", () => {
     "New cancer drug approved",
     "Coach accused of abuse",
     "Executive charged with manslaughter",
-  ])("refuses %s as tragedy, sourced or not", (title) => {
+    "Man arrested after bank robbery",
+    "Burglary spree hits downtown shops",
+    "Assault outside a nightclub",
+    "Shooting at a mall",
+    "Stabbing on the subway",
+    "Kidnapping suspect caught",
+    "Teens arrested for shoplifting",
+  ])("refuses %s as tragedy (including violent and street crime), sourced or not", (title) => {
     expect(storyRefusal(title, { sourced: true })).toBe("tragedy");
     expect(storyRefusal(title, { sourced: false })).toBe("tragedy");
     expect(isSafeStory(title)).toBe(false);
@@ -128,6 +135,10 @@ describe("story filter", () => {
     "Local man sues the city over a parking ticket",
     "A woman in Ohio was charged with fraud",
     "My boss got fired for lying",
+    "Man arrested for tax fraud",
+    "Woman charged over unpaid parking tickets",
+    "Local resident sues the city",
+    "Teen charged over school prank",
   ])("refuses %s as private_person, sourced or not", (title) => {
     expect(storyRefusal(title, { sourced: true })).toBe("private_person");
     expect(storyRefusal(title, { sourced: false })).toBe("private_person");
@@ -144,6 +155,10 @@ describe("story filter", () => {
     "Jury convicts crypto founder of fraud",
     "Acme fires its chief financial officer",
     "Tesla's ex-CEO steps down from the board",
+    "Acme executive Jane Smith arrested for insider trading",
+    "Big bank fined over money laundering checks",
+    "Crypto exchange founder convicted of fraud",
+    "Senator indicted on bribery charges",
   ])("a feed story keeps %s (business and legal news with a source)", (title) => {
     expect(isSafeStory(title)).toBe(true);
     expect(storyRefusal(title, { sourced: true })).toBeNull();

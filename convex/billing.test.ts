@@ -17,10 +17,13 @@ const DAY = 24 * 60 * 60 * 1000;
 
 const INVESTIGATION_URL = "https://news.example.com/acme-ceo-investigated";
 const AFFAIR_URL = "https://news.example.com/acme-ceo-affairs";
+const WSJ_URL = "https://www.wsj.com/business/nvidia-is-preparing-to-oust-nvidia-ceo-jensen-huang-30f421ad?mod=e2tw";
+const READABLE_URL = "https://www.reuters.com/business/acme-ships-a-folding-robot-2026-11-15/";
 const ARTICLES: Record<string, string> = {
   [INVESTIGATION_URL]:
     '<html><head><meta property="og:site_name" content="Example News"><meta property="og:title" content="Regulators investigate Acme chief executive Jane Smith"><meta property="og:description" content="Regulators opened an investigation into the accounts."></head></html>',
   [AFFAIR_URL]: '<html><head><meta property="og:title" content="Acme chief executive Jane Smith and her affairs"></head></html>',
+  [READABLE_URL]: "<html><head><title>Acme's robot folds laundry in under a minute</title></head></html>",
 };
 
 type T = ReturnType<typeof convexTest>;
@@ -172,6 +175,45 @@ describe("commissions", () => {
     const [row] = await t.run(async (ctx) => ctx.db.query("commissions").collect());
     expect(row).toMatchObject({ link: INVESTIGATION_URL, headline: "Regulators investigate Acme chief executive Jane Smith" });
     expect(row.facts).toContain("The article was published by Example News.");
+  });
+
+  test("an unreadable paywalled link falls back to a headline made from its URL, attributed to the publisher", async () => {
+    const t = convexTest(schema, modules);
+    const res = await t.action(api.commissions.start, { deviceId: DEVICE, link: WSJ_URL });
+    if (!res.ok) throw new Error(`start failed: ${JSON.stringify(res)}`);
+    expect(calls.find((c) => c.url === WSJ_URL)).toBeDefined();
+    const [row] = await t.run(async (ctx) => ctx.db.query("commissions").collect());
+    expect(row).toMatchObject({
+      link: WSJ_URL,
+      topic: "Nvidia is preparing to oust nvidia ceo jensen huang",
+      headline: "Nvidia is preparing to oust nvidia ceo jensen huang",
+      facts: ["The Wall Street Journal reports: Nvidia is preparing to oust nvidia ceo jensen huang."],
+    });
+  });
+
+  test("an unreadable link with a short slug is refused, and slug headlines follow the content rules", async () => {
+    const t = convexTest(schema, modules);
+    expect(await t.action(api.commissions.start, { deviceId: DEVICE, link: "https://www.wsj.com/tech/nvidia-earnings-30f421ad?mod=e2tw" })).toEqual({
+      ok: false,
+      reason: "bad_input",
+      refusal: "unreadable_link",
+      message: "Robo could not open that page. Type the headline instead.",
+    });
+    expect(await t.action(api.commissions.start, { deviceId: DEVICE, link: "https://www.nytimes.com/2026/11/15/business/acme-chief-executive-and-her-affairs.html" })).toEqual({
+      ok: false,
+      reason: "not_allowed",
+      refusal: "private_life",
+    });
+    expect(await t.run(async (ctx) => ctx.db.query("commissions").collect())).toHaveLength(0);
+  });
+
+  test("a readable page still uses its real title, not the slug", async () => {
+    const t = convexTest(schema, modules);
+    const res = await t.action(api.commissions.start, { deviceId: DEVICE, link: READABLE_URL });
+    if (!res.ok) throw new Error(`start failed: ${JSON.stringify(res)}`);
+    const [row] = await t.run(async (ctx) => ctx.db.query("commissions").collect());
+    expect(row.headline).toBe("Acme's robot folds laundry in under a minute");
+    expect(row.facts).toContain("The article was published by Reuters.");
   });
 
   test("a spent image cap is refused before checkout", async () => {

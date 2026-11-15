@@ -102,6 +102,13 @@ describe("keiki tool endpoint", () => {
     pages["https://news.example.com/indicted"] = `<html><head><title>Senator Jane Smith indicted for fraud</title></head></html>`;
     expect((await callTool(t, "commission", { request: "https://news.example.com/indicted" })).body).toMatchObject({ ok: true });
     expect((await callTool(t, "commission", { request: "https://news.example.com/missing" })).body).toMatchObject({ ok: false, reason: "bad_link" });
+    const wsj = "https://www.wsj.com/business/nvidia-is-preparing-to-oust-nvidia-ceo-jensen-huang-30f421ad?mod=e2tw";
+    expect((await callTool(t, "commission", { request: wsj })).body).toMatchObject({ ok: true });
+    const texted = (await t.run((ctx) => ctx.db.query("textCommissions").collect())).find((row) => row.link === wsj);
+    expect(texted).toMatchObject({
+      headline: "Nvidia is preparing to oust nvidia ceo jensen huang",
+      facts: ["The Wall Street Journal reports: Nvidia is preparing to oust nvidia ceo jensen huang."],
+    });
     expect((await callTool(t, "commission", { request: "   " })).body).toMatchObject({ ok: false, reason: "bad_input" });
   });
 

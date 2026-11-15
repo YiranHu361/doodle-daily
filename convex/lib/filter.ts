@@ -3,6 +3,7 @@ export type Refusal = "tragedy" | "private_life" | "private_person" | "needs_sou
 const TRAGEDY: RegExp[] = [
   /\b(dead|death|deaths|die|dies|died|dying|kill|kills|killed|killing|murder\w*|homicide|manslaughter|suicide\w*|fatal\w*|corpse|funeral|obituar\w*)\b/i,
   /\b(shooting|shot dead|gunman|gunfire|stabb\w*|assault\w*|attack(?:ed|er|ers)? (?:on|by) (?:a |an |the )?(?:man|woman|child|people|police|crowd)|violence|violent|massacre|hostage\w*|terror\w*|bomb\w*|explosion|riot\w*)\b/i,
+  /\b(robber\w*|robbed|burglar\w*|kidnap\w*|abduct\w*|carjack\w*|mugg(?:ed|ing|er|ers)|arson\w*|shoplift\w*|pickpocket\w*|loot(?:ed|ing|ers)|vandal\w*|gang|gangs|stolen at gunpoint|street crime)\b/i,
   /\b(war|wars|warfare|airstrike\w*|missile\w*|invasion|troops|militar\w+|genocide|ceasefire)\b/i,
   /\b(earthquake|hurricane|tornado|wildfire|flood\w*|tsunami|disaster\w*|crash(?:ed)? (?:kills|landing)|plane crash|derail\w*|collapse(?:d)? (?:kills|building))\b/i,
   /\b(cancer|illness|disease\w*|virus|pandemic|epidemic|outbreak|overdose|hospitali[sz]ed|diagnos\w+|dementia|stroke|heart attack)\b/i,
@@ -22,11 +23,12 @@ const PRIVATE_PERSON: RegExp[] = [
   /\b(?:my|our) (?:boss|manager|teacher|friend|friends|cousin|uncle|aunt|brother|sister|mom|mum|dad|mother|father|wife|husband|girlfriend|boyfriend|partner)\b(?=.*\b(?:arrest\w*|charged|sued|fired|jail\w*|prison\w*|convict\w*|investigat\w*|scandal|cheat\w*|stole|lied|fraud)\b)/i,
   /\blocal (?:man|woman|men|women|teen|teens|teenager|resident|residents|couple|family|mom|dad|mother|father)\b/i,
   /\bprivate (?:citizen|citizens|individual|individuals|person)\b/i,
+  /\b(?:man|woman|men|women|teen|teens|teenager|boy|girl|couple|mother|father|mom|dad|resident|driver|shopper|passenger)\s+(?:\w+\s+)?(?:arrest\w*|charged|sued|jailed|convicted|accused|indicted|sentenced|fined|fired)\b/i,
   /\ba (?:man|woman|teen|teenager|boy|girl|mother|father|mom|dad|couple|grandmother|grandfather) (?:from|in|who)\b/i,
 ];
 
 const LEGAL =
-  /\b(investigat\w*|probe|probes|probed|probing|lawsuits?|sued|sues|suing|charged|charges|indict\w*|arrest\w*|convict\w*|jail\w*|prison\w*|sentenced|sentencing|guilty|trial|fraud\w*|embezzl\w*|brib\w*|insider trading|smuggl\w*|spy|spies|spying|espionage|misconduct|scandal\w*|accus\w*|alleg\w*|fired|ousted|resign\w*|steps? down|stepped down)\b/i;
+  /\b(investigat\w*|probe|probes|probed|probing|lawsuits?|sued|sues|suing|charged|charges|indict\w*|arrest\w*|convict\w*|jail\w*|prison\w*|sentenced|sentencing|guilty|trial|fraud\w*|embezzl\w*|brib\w*|insider trading|smuggl\w*|spy|spies|spying|espionage|misconduct|scandal\w*|accus\w*|alleg\w*|fired|oust\w*|resign\w*|steps? down|stepped down)\b/i;
 
 const PERSON_ROLE =
   /\b(ceo|cfo|coo|cto|chief executive|chief \w+ officer|founder|co-?founder|chair|chairman|chairwoman|chairperson|president|executive|exec|director|senator|governor|mayor|minister|congressman|congresswoman|lawmaker|politician|billionaire|celebrity|actor|actress|singer|rapper|athlete|influencer|he|she|him|her|his)\b/i;

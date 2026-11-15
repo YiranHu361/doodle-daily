@@ -46,7 +46,7 @@ export function startFailMessage(reason: StartFailure): string {
   }
 }
 
-export type Refusal = "needs_source" | "private_life" | "tragedy" | "private_person";
+export type Refusal = "needs_source" | "private_life" | "tragedy" | "private_person" | "unreadable_link";
 
 export function refusalMessage(refusal: Refusal | undefined): string | null {
   switch (refusal) {
@@ -58,6 +58,8 @@ export function refusalMessage(refusal: Refusal | undefined): string | null {
       return "Robo skips stories about crime and tragedy. Try another topic.";
     case "private_person":
       return "Robo only draws public figures, not private people. Try another topic.";
+    case "unreadable_link":
+      return "Robo could not open that page. Type the headline instead.";
     default:
       return null;
   }

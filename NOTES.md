@@ -187,17 +187,29 @@
   ...` or `according to X`); with a `source` option it must name that exact source. `pipeline.ts` does not pass
   `source` yet, so feed comics are held to the attribution form, not the exact outlet.
 - **Refused everywhere** (`storyRefusal` in `convex/lib/filter.ts`): `tragedy` (death, violence, war, disasters,
-  illness, abuse), `private_life` (sex, affairs, relationships, health, family of real people) and
-  `private_person` (neighbours, co-workers, "local man", private citizens). Checked in that order.
+  illness, abuse, and violent or street crime such as robbery, burglary, kidnapping or shoplifting), `private_life` (sex, affairs, relationships, health, family of real people) and
+  `private_person` (neighbours, co-workers, "local man", an unnamed man or woman in legal trouble, private
+  citizens). Checked in that order.
 - **Typed topics are unsourced.** A commission with no link that claims misconduct or legal trouble by a named
   person or a role such as CEO gets `needs_source`. Companies, products, ideas, the reader's own life and public
   figures' work are fine.
-- **`commissions:start` refusals** keep `reason: "not_allowed"` (the app's `startFailMessage` is typed to the old
-  list) and add `refusal`: `needs_source` | `private_life` | `tragedy` | `private_person`. `needs_source` also
-  carries `message`: That one needs a source. Paste a link to the article and Robo will draw it. A link commission
-  adds a fact naming the publisher (`og:site_name`, else the host) so the writer can name it.
+- **`commissions:start` refusals** keep `reason: "not_allowed"` (or `"bad_input"` for an unreadable link) and add
+  `refusal`: `needs_source` | `private_life` | `tragedy` | `private_person` | `unreadable_link`. `needs_source` and
+  `unreadable_link` also carry `message`, which the Create sheet shows first; otherwise it uses `refusalMessage`
+  in `src/billing/logic.ts`. A link commission
+  adds a fact naming the publisher (`og:site_name`, else a known-publisher map, else the host) so the writer can
+  name it.
+- **Unreadable links** (any non-200 such as wsj.com's 401, a timeout, or no title) fall back to a headline made from
+  the URL's last path segment (trailing id like `-30f421ad` and query dropped, hyphens to spaces, first letter
+  capitalised) with exactly one fact, `<Publisher> reports: <headline>.`, and the original link kept. The publisher
+  comes from a small map (WSJ, NYT, Bloomberg, FT, Reuters, Washington Post, The Information, The Economist,
+  Business Insider, CNBC), otherwise the bare domain. A slug under four words is refused with `reason: "bad_input"`,
+  `refusal: "unreadable_link"` and `message`: Robo could not open that page. Type the headline instead. The slug
+  headline goes through the same content rules as a sourced story. `readLink` in `convex/commissions.ts` does this
+  for both the Create sheet and Keiki's `commission` tool, which answers `bad_link` only for a short slug.
 - **`isSafeStory`** is `storyRefusal(text, { sourced: true }) === null`, so paper names and niches
   (`papers:create`) get the same looser rules.
+
 ## Thread 6 (polish and Revyl tests)
 
 - **Card to Reader flight** (`src/components/Flight.tsx`). Native-stack screens cannot share elements, so the

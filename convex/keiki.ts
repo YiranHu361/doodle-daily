@@ -2,10 +2,9 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { httpAction, internalAction, internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
-import { pageMeta, parseLink, TOPIC_MAX, type PageMeta } from "./commissions";
+import { parseLink, readLink, TOPIC_MAX, type LinkRead, type PageMeta } from "./commissions";
 import { pacificDate } from "./lib/dates";
 import { isVisible, visibleComics } from "./lib/dto";
-import { USER_AGENT_HEADERS } from "./lib/feeds";
 import { storyRefusal } from "./lib/filter";
 import { fetchText } from "./lib/http";
 import { constantTimeEqual } from "./lib/retry";
@@ -367,22 +366,23 @@ export const tool = httpAction(async (ctx, req) => {
   if (topic.length > TOPIC_MAX || (!topic && !rawLink)) return refuse("bad_input");
   let link: string | undefined;
   let page: PageMeta = { title: "", description: "" };
+  let slug: LinkRead["slug"] = null;
   if (rawLink) {
     const parsed = parseLink(rawLink);
     if (!parsed) return refuse("bad_link");
-    const res = await fetchText(parsed, { headers: USER_AGENT_HEADERS, timeoutMs: 6000 });
-    if (res.ok) page = pageMeta(res.text);
-    if (!page.title) return refuse("bad_link");
+    const read = await readLink(parsed);
+    if (!read) return refuse("bad_link");
+    ({ page, slug } = read);
     link = parsed;
   }
-  const { headline, facts } = briefFor(topic, page);
+  const { headline, facts } = slug ? { headline: topic || slug.headline, facts: [slug.fact] } : briefFor(topic, page);
   const refusal = storyRefusal(`${headline} ${facts.join(" ")}`, { sourced: !!link });
   if (refusal) return refuse(refusal === "needs_source" ? "needs_source" : "unsafe");
   const checkoutUrl = textCommissionCheckoutUrl(call.sender);
   if (checkoutUrl) return json({ ok: false, reason: "payment_needed", checkoutUrl });
   const res = await ctx.runMutation(internal.keiki.createCommission, {
     sender: call.sender,
-    topic: cut(topic || page.title, TOPIC_MAX),
+    topic: cut(topic || headline, TOPIC_MAX),
     link,
     headline: cut(headline, 200),
     facts,
