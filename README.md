@@ -98,6 +98,20 @@ revyl test create read-and-clear-the-day --from-file .revyl/tests/01-read-and-cl
 revyl test run read-and-clear-the-day
 ```
 
+## Text Newsie (Keiki)
+
+Newsie is a Keiki agent (`external_ref: doodle-daily-newsie`) on Keiki's shared iMessage number.
+Text it an article link or a few words ("the Fed meeting"); it answers "On it" at once and sends the
+finished comic about a minute later. Text "today" for today's lead comic.
+
+- **Join:** the shared number and join code come from `get_agents_shared_line` and are filled in
+  `src/data/newsie.ts` (the Today footer shows "Text Newsie a link" once they are set).
+- **Backend:** `convex/keiki.ts` serves the agent's three webhook tools at
+  `/keiki/<KEIKI_TOOL_SECRET>/{commission,status,today}` and calls Keiki's notice endpoint when a comic
+  is ready or failed.
+- **Deploy the agent:** `KEIKI_TOOL_SECRET=$(npx convex env get KEIKI_TOOL_SECRET) node scripts/deploy-newsie.mjs`
+  (needs `KEIKI_API_KEY`), then `npx convex env set KEIKI_AGENT_ID <agentId>`.
+
 ## Pull requests
 
 | # | What |

@@ -1,4 +1,5 @@
 import * as Haptics from "expo-haptics";
+import * as Linking from "expo-linking";
 import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from "react-native";
@@ -22,6 +23,7 @@ import { restartColdStartWindow } from "../src/data/connectionHooks";
 import { drawMessage, type DrawFailure } from "../src/data/drawFlow";
 import { filterComics, orderForToday, stillDrawing, type Chip } from "../src/data/filter";
 import { useDrawFresh, useToday } from "../src/data/hooks";
+import { newsieSmsUrl } from "../src/data/newsie";
 import type { Comic, Edition } from "../src/data/types";
 import { Robo } from "../src/robo/Robo";
 import { isRead, useCombo } from "../src/streak";
@@ -128,6 +130,7 @@ function TodayScreen() {
     if (draw.state.phase === "requesting") scroller.current?.scrollTo({ y: chipY, animated: !reduce });
   }, [draw.state.phase, chipY, reduce]);
 
+  const newsieUrl = newsieSmsUrl();
   const open = (c: Comic) => router.push({ pathname: "/reader/[comicId]", params: { comicId: c._id } });
   void combo;
 
@@ -160,6 +163,7 @@ function TodayScreen() {
         <View style={styles.footer}>
           <SecondaryButton testID="archiveButton" label={copy.backIssues} onPress={() => router.push("/archive")} style={styles.footerButton} />
           <SecondaryButton testID="papersButton" label="Papers" onPress={() => setPapers(true)} style={styles.footerButton} />
+          {newsieUrl ? <SecondaryButton testID="textNewsieButton" label="Text Newsie a link" onPress={() => Linking.openURL(newsieUrl)} style={styles.footerButton} /> : null}
           <Text style={styles.footerLine}>{copy.footer}</Text>
         </View>
       </View>

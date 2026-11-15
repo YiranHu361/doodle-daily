@@ -221,3 +221,22 @@
   focus), so the paid run filled the same checkout URL in a desktop browser and returned to the app.
 - **Spend at 1:45 pm (Pacific), 2026-11-15:** 85 images used of a 160 cap, 37 script calls, about $6.13.
 
+## Thread 8 (Keiki)
+
+- **Organization.** Newsie lives in the organization behind `KEIKI_API_KEY` (the account made with the hackathon
+  code). The first spike's "Yiran's Organization" stayed plan-less, so its Newsie never ran tools.
+- **Tools are three webhooks on one Convex route.** `http.ts` registers `pathPrefix: "/keiki/"`;
+  `convex/keiki.ts` reads `/keiki/<secret>/<tool>` and answers 404 unless the secret matches
+  `KEIKI_TOOL_SECRET` (at least 24 characters, constant-time compare). Keiki signs no cloud webhook tool calls.
+- **Own table, not `commissions`.** Texted comics live in `textCommissions` (sender, Pacific date, status
+  drawing/ready/failed, friendly reason, notice state), so the Whop commission flow is untouched. The sender is
+  `context.phone`, else `context.userId`. Each sender gets 2 a day; the image cap is checked before the row is
+  created and reserved again by `pipeline:drawFromBrief` (`kind: "commission"`, source "Texted in by a reader").
+- **Delivery.** A watcher checks the comic every 10 s (up to 25 minutes). Ready or failed schedules
+  `keiki:notify`, which posts `/api/v1/developer/agents/{KEIKI_AGENT_ID}/notice` with the sender as `phone`; the
+  notice only names the commission id, and the agent fetches the facts with `get_comic_status`.
+- **App link** is `doodledaily://reader/<comicId>` (opens today's issue in the Reader).
+- **Later hook.** `textCommissionCheckoutUrl` returns null; a $1 text commission would return a Whop checkout URL
+  there and the tool answers `payment_needed` with it.
+- **Agent spec** is `scripts/deploy-newsie.mjs` plus `scripts/newsie-prompt.md`; it deploys with an `api`
+  channel (the API gateway is the test channel) and `features.sandbox` for `send_file`.
