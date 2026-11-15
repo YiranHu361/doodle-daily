@@ -13,6 +13,7 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
+import { ComboReward } from "../billing";
 import { Robo } from "../robo/Robo";
 import { colors, cut, springs, type } from "../theme";
 import { copy } from "./copy";
@@ -136,6 +137,7 @@ function CelebrationView({ celebration, onDone }: { celebration: Celebration; on
           <View style={styles.bubbleTail} />
           <Text style={styles.bubbleText}>{celebration.bubble}</Text>
         </Animated.View>
+        <ComboReward comboDays={celebration.to} day={celebration.day} />
         <Animated.View style={[styles.buttonWrap, buttonStyle]}>
           <Pressable testID="celebrationContinue" accessibilityRole="button" accessibilityLabel={copy.keepReading} onPress={onDone} disabled={!rest}>
             <CutBox cut={cut.button} fill={colors.neon.volt} stroke={colors.neon.volt} glow={colors.neon.volt} style={styles.button}>

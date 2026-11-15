@@ -60,7 +60,8 @@ export function useToday(enabled = true): ScreenState<Edition> {
 export function useEditionByDate(date: string | null): ScreenState<Edition> {
   const { fixtures } = useFlags();
   const version = useFixtureVersion();
-  const raw = useQuery(api.editions.byDate, date && !fixtures ? { date } : "skip");
+  const deviceId = useDeviceId();
+  const raw = useQuery(api.editions.byDate, date && deviceId && !fixtures ? { date, deviceId } : "skip");
   const conn = useConnection();
   const live = useMemo(() => {
     void version;
@@ -80,7 +81,8 @@ export function useIssue(date: string | null): ScreenState<Edition> {
 export function useEditionList(): ScreenState<EditionSummary[]> {
   const { fixtures } = useFlags();
   const version = useFixtureVersion();
-  const raw = useQuery(api.editions.list, fixtures ? "skip" : {});
+  const deviceId = useDeviceId();
+  const raw = useQuery(api.editions.list, fixtures || !deviceId ? "skip" : { deviceId });
   const conn = useConnection();
   const live = useMemo(() => {
     void version;

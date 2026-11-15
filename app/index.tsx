@@ -1,7 +1,7 @@
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { ChipRow } from "../src/components/ChipRow";
@@ -13,7 +13,7 @@ import { SkeletonList } from "../src/components/Skeleton";
 import { EmptyState, ErrorBoundary, ErrorState } from "../src/components/States";
 import { useToast } from "../src/components/Toast";
 import { Banner, SecondaryButton } from "../src/components/ui";
-import { PaywallSheet, usePlus } from "../src/billing";
+import { ComboFreeze, PaywallSheet, usePlus } from "../src/billing";
 import { now, formatIssueDate, pacificDate } from "../src/data/clock";
 import { restartColdStartWindow } from "../src/data/connectionHooks";
 import { drawMessage, type DrawFailure } from "../src/data/drawFlow";
@@ -26,7 +26,7 @@ import { ComboPill, ComboSheet } from "../src/streak/ui";
 import { colors, cut, space, type } from "../src/theme";
 import { copy } from "../src/theme/copy";
 
-function Masthead({ edition, onCombo }: { edition: Edition | null; onCombo: () => void }) {
+function Masthead({ edition, onCombo, onPlus }: { edition: Edition | null; onCombo: () => void; onPlus: () => void }) {
   const { plus } = usePlus();
   return (
     <View style={styles.masthead}>
@@ -41,9 +41,11 @@ function Masthead({ edition, onCombo }: { edition: Edition | null; onCombo: () =
             </CutBox>
           ) : null}
           {plus ? (
-            <CutBox cut={cut.chip} stroke={colors.neon.volt} strokeWidth={1} style={styles.issueTag}>
-              <Text style={styles.issue}>PLUS</Text>
-            </CutBox>
+            <Pressable testID="plusTag" accessibilityRole="button" accessibilityLabel="Plus membership" onPress={onPlus} hitSlop={8}>
+              <CutBox cut={cut.chip} stroke={colors.neon.volt} strokeWidth={1} style={styles.issueTag}>
+                <Text style={styles.issue}>PLUS</Text>
+              </CutBox>
+            </Pressable>
           ) : null}
         </View>
         <View accessible accessibilityRole="header" accessibilityLabel="Doodle Daily" testID="wordmark">
@@ -143,7 +145,7 @@ function TodayScreen() {
       <GridBackground />
       <SafeAreaView style={styles.flex} edges={["top"]}>
         <ScrollView testID="todayList" stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: DOCK_HEIGHT + 56 }}>
-          <Masthead edition={edition} onCombo={() => setSheet(true)} />
+          <Masthead edition={edition} onCombo={() => setSheet(true)} onPlus={() => setPaywall(true)} />
           <ChipRow value={chip} onChange={setChip} />
           <View style={styles.content}>{body}</View>
         </ScrollView>
@@ -151,6 +153,7 @@ function TodayScreen() {
       <Dock ref={dock} busy={draw.busy} onDraw={draw.start} />
       <ComboSheet visible={sheet} onClose={() => setSheet(false)} />
       <PaywallSheet visible={paywall} onClose={() => setPaywall(false)} />
+      <ComboFreeze />
     </View>
   );
 }
