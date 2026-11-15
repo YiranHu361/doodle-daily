@@ -1,3 +1,4 @@
+import { UNVERIFIED_SENTENCE } from "../lib/script";
 import type { MemePickInput, PickInput, ScriptInput } from "./types";
 
 export function editorPrompt(input: PickInput): string {
@@ -89,6 +90,15 @@ FACTS (the only facts you may use): ${input.facts.join(" ")}
 OPTIONAL FORMATS you may borrow if one fits: ${formats}
 
 ${CAST_AND_RULES("2 plain sentences a reader could repeat to a friend.")}`;
+  const unverified = input.unverified
+    ? `
+
+UNVERIFIED LINK: Doodle Daily could not open this article, so nobody has checked it.
+- Every caption must stay in the frame of the link's headline: start it with
+  "The link says" or "According to the link's headline". Never say the
+  publisher reports anything, and add nothing beyond the headline.
+- "realStory" must end with this exact sentence: ${UNVERIFIED_SENTENCE}`
+    : "";
   const repair = input.repair
     ? `
 
@@ -98,5 +108,5 @@ It failed these checks:
 ${input.repair.errors.map((e) => "- " + e).join("\n")}
 Fix every problem and return the whole comic again.`
     : "";
-  return header + body + repair;
+  return header + body + unverified + repair;
 }

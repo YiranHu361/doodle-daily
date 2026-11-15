@@ -22,6 +22,10 @@ const NOTICE_TIMEOUT_MS = 10_000;
 const KEIKI_API = "https://onkeiki.com/api/v1/developer";
 export const TEXT_SOURCE = "Texted in by a reader";
 
+export function textOwner(sender: string): string {
+  return `text:${sender}`;
+}
+
 type TextFailure = typeof textFailure.type;
 
 export const FRIENDLY: Record<TextFailure, string> = {
@@ -111,7 +115,14 @@ const createResult = v.union(
 );
 
 export const createCommission = internalMutation({
-  args: { sender: v.string(), topic: v.string(), link: v.optional(v.string()), headline: v.string(), facts: v.array(v.string()) },
+  args: {
+    sender: v.string(),
+    topic: v.string(),
+    link: v.optional(v.string()),
+    headline: v.string(),
+    facts: v.array(v.string()),
+    unverified: v.optional(v.boolean()),
+  },
   returns: createResult,
   handler: async (ctx, args): Promise<typeof createResult.type> => {
     const now = Date.now();
@@ -134,11 +145,14 @@ export const createCommission = internalMutation({
 
 export const brief = internalQuery({
   args: { commissionId: v.id("textCommissions") },
-  returns: v.union(v.null(), v.object({ headline: v.string(), facts: v.array(v.string()), link: v.string() })),
+  returns: v.union(
+    v.null(),
+    v.object({ headline: v.string(), facts: v.array(v.string()), link: v.string(), sender: v.string(), unverified: v.boolean() }),
+  ),
   handler: async (ctx, { commissionId }) => {
     const row = await ctx.db.get(commissionId);
     if (!row || row.status !== "drawing" || row.comicId) return null;
-    return { headline: row.headline, facts: row.facts, link: row.link ?? "" };
+    return { headline: row.headline, facts: row.facts, link: row.link ?? "", sender: row.sender, unverified: row.unverified === true };
   },
 });
 
@@ -155,6 +169,8 @@ export const draw = internalAction({
         sourceName: TEXT_SOURCE,
         sourceUrl: job.link,
         kind: "commission",
+        owner: textOwner(job.sender),
+        unverified: job.unverified || undefined,
       });
       if (res.ok) await ctx.runMutation(internal.keiki.drawStarted, { commissionId, comicId: res.comicId });
       else
@@ -394,6 +410,7 @@ export const tool = httpAction(async (ctx, req) => {
     link,
     headline: cut(headline, 200),
     facts,
+    unverified: slug ? true : undefined,
   });
   if (!res.ok) return refuse(res.reason);
   return json({ ok: true, commission_id: res.commissionId, status: "drawing", eta_seconds: 60 });

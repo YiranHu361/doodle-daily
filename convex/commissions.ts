@@ -6,6 +6,7 @@ import { pacificDate } from "./lib/dates";
 import { checkDeviceId } from "./lib/device";
 import { USER_AGENT_HEADERS } from "./lib/feeds";
 import { storyRefusal } from "./lib/filter";
+import { UNVERIFIED_SENTENCE } from "./lib/script";
 import { fetchText } from "./lib/http";
 import { cut, decodeEntities } from "./lib/text";
 import { createCheckout, planId, whop, whopConfig } from "./lib/whop";
@@ -16,7 +17,7 @@ const LINK_MAX = 2000;
 const IMAGES_PER_COMIC = 4;
 const WATCH_EVERY_MS = 20_000;
 const WATCH_LIMIT = 75;
-export const COMMISSION_SOURCE = "Commissioned by a reader";
+export const COMMISSION_SOURCE = "Created by a reader";
 export const NEEDS_SOURCE_MESSAGE = "That one needs a source. Paste a link to the article and Robo will draw it.";
 export const UNREADABLE_LINK_MESSAGE = "Robo could not open that page. Type the headline instead.";
 
@@ -97,7 +98,7 @@ export async function readLink(link: string): Promise<LinkRead | null> {
   const publisher = cut(siteName, 80) || publisherFor(link);
   if (page.title) return { page, publisher, slug: null };
   const headline = slugHeadline(link);
-  return headline ? { page, publisher, slug: { headline, fact: `${publisher} reports: ${headline}.` } } : null;
+  return headline ? { page, publisher, slug: { headline, fact: `A link a reader pasted from ${publisher} is titled: ${headline}. ${UNVERIFIED_SENTENCE}` } } : null;
 }
 
 const startResult = v.union(
@@ -114,7 +115,14 @@ const startResult = v.union(
 type StartResult = typeof startResult.type;
 
 export const create = internalMutation({
-  args: { deviceId: v.string(), topic: v.string(), link: v.optional(v.string()), headline: v.string(), facts: v.array(v.string()) },
+  args: {
+    deviceId: v.string(),
+    topic: v.string(),
+    link: v.optional(v.string()),
+    headline: v.string(),
+    facts: v.array(v.string()),
+    unverified: v.optional(v.boolean()),
+  },
   returns: v.id("commissions"),
   handler: async (ctx, args) => {
     const now = Date.now();
@@ -170,7 +178,14 @@ export const start = action({
     if (refusal) return { ok: false, reason: "not_allowed", refusal, ...(refusal === "needs_source" ? { message: NEEDS_SOURCE_MESSAGE } : {}) };
     if ((await ctx.runQuery(internal.pipeline.capLeft, { date: pacificDate(Date.now()) })) < IMAGES_PER_COMIC) return { ok: false, reason: "spend_cap" };
     if (!whopConfig().ok) return { ok: false, reason: "unavailable" };
-    const commissionId = await ctx.runMutation(internal.commissions.create, { deviceId: args.deviceId, topic: headline, link, headline, facts });
+    const commissionId = await ctx.runMutation(internal.commissions.create, {
+      deviceId: args.deviceId,
+      topic: headline,
+      link,
+      headline,
+      facts,
+      unverified: slug ? true : undefined,
+    });
     const checkout = await createCheckout(planId("commission"), { kind: "commission", deviceId: args.deviceId, commissionId });
     await ctx.runMutation(internal.commissions.attachCheckout, { commissionId, checkoutId: checkout.ok ? checkout.id : undefined });
     if (!checkout.ok) {
@@ -245,12 +260,15 @@ export const notePaymentFailed = internalMutation({
 
 export const beginDraw = internalMutation({
   args: { commissionId: v.id("commissions") },
-  returns: v.union(v.null(), v.object({ headline: v.string(), facts: v.array(v.string()), link: v.string() })),
+  returns: v.union(
+    v.null(),
+    v.object({ headline: v.string(), facts: v.array(v.string()), link: v.string(), deviceId: v.string(), unverified: v.boolean() }),
+  ),
   handler: async (ctx, { commissionId }) => {
     const row = await ctx.db.get(commissionId);
     if (!row || row.status !== "paid") return null;
     await ctx.db.patch(commissionId, { status: "drawing", updatedAt: Date.now() });
-    return { headline: row.headline, facts: row.facts, link: row.link ?? "" };
+    return { headline: row.headline, facts: row.facts, link: row.link ?? "", deviceId: row.deviceId, unverified: row.unverified === true };
   },
 });
 
@@ -277,6 +295,8 @@ export const draw = internalAction({
         sourceName: COMMISSION_SOURCE,
         sourceUrl: brief.link,
         kind: "commission",
+        owner: brief.deviceId,
+        unverified: brief.unverified || undefined,
       });
       if (res.ok) await ctx.runMutation(internal.commissions.drawStarted, { commissionId, comicId: res.comicId });
       else await ctx.runMutation(internal.commissions.fail, { commissionId, error: `draw refused: ${res.reason}` });

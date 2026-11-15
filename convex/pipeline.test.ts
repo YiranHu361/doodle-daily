@@ -150,7 +150,7 @@ describe("failures", () => {
     const res = await t.action(internal.pipeline.drawFromBrief, {
       headline: "A robot learns to fold laundry",
       facts: ["A reader asked for a comic about a robot that folds laundry."],
-      sourceName: "Commissioned by a reader",
+      sourceName: "Created by a reader",
       sourceUrl: "",
       kind: "commission",
     });
@@ -171,7 +171,7 @@ describe("failures", () => {
     await t.action(internal.pipeline.drawFromBrief, {
       headline: "A robot learns to fold laundry",
       facts: ["A robot folds laundry slowly."],
-      sourceName: "Commissioned by a reader",
+      sourceName: "Created by a reader",
       sourceUrl: "",
       kind: "commission",
     });
@@ -367,7 +367,7 @@ describe("pipeline:drawFreshOne", () => {
 describe("pipeline:drawFromBrief", () => {
   test("refuses banned topics and empty briefs before paying for anything", async () => {
     const t = convexTest(schema, modules);
-    const base = { sourceName: "Commissioned by a reader", sourceUrl: "", kind: "commission" as const };
+    const base = { sourceName: "Created by a reader", sourceUrl: "", kind: "commission" as const };
     expect(await t.action(internal.pipeline.drawFromBrief, { ...base, headline: "My neighbour was arrested", facts: ["He was arrested."] })).toEqual({ ok: false, reason: "unsafe" });
     expect(await t.action(internal.pipeline.drawFromBrief, { ...base, headline: " ", facts: [] })).toEqual({ ok: false, reason: "bad_brief" });
     expect(await spend(t)).toMatchObject({ imagesReserved: 0, scriptCalls: 0 });
@@ -378,13 +378,16 @@ describe("pipeline:drawFromBrief", () => {
     const res = await t.action(internal.pipeline.drawFromBrief, {
       headline: "Our seed round closed",
       facts: ["The startup closed its seed round on Friday.", "The money will pay for a bigger office."],
-      sourceName: "Commissioned by a reader",
+      sourceName: "Created by a reader",
       sourceUrl: "",
       kind: "commission",
+      owner: "device-1234-abcd",
     });
     expect(res.ok).toBe(true);
     await settleAll(t, 10_000);
-    const today = (await t.query(api.editions.today, {}))!;
-    expect(today.comics[0]).toMatchObject({ kind: "commission", section: "money", sourceName: "Commissioned by a reader", status: "ready" });
+    const today = (await t.query(api.editions.today, { deviceId: "device-1234-abcd" }))!;
+    expect(today.comics[0]).toMatchObject({ kind: "commission", section: "money", sourceName: "Created by a reader", status: "ready", unverified: false });
+    expect(await t.query(api.editions.today, { deviceId: "device-9999-zzzz" })).toBeNull();
+    expect(await t.query(api.editions.today, {})).toBeNull();
   });
 });

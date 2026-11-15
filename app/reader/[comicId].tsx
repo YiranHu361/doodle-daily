@@ -262,7 +262,7 @@ function ReaderView({ comic }: { comic: Comic }) {
                   {page < REAL_STORY_PAGE ? <Text style={styles.counterText}>{page + 1}/4</Text> : <CompassIcon color={color} />}
                 </View>
               </View>
-              <SectionTag section={comic.section} />
+              <SectionTag section={comic.section} unverified={comic.unverified} />
               <Text style={styles.title} numberOfLines={2} accessibilityRole="header">
                 {comic.title}
               </Text>

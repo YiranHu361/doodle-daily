@@ -268,6 +268,22 @@ describe("script validation", () => {
     };
   }
 
+  test("an unverified link keeps every caption in the link's frame and ends the Real story with the could-not-check sentence", () => {
+    const unverified = { kind: "news" as const, headline: "Robots learn to fold laundry at home", unverified: true };
+    const framed = (caption: string, realStory: string): Script => ({
+      ...goodScript(),
+      panels: goodScript().panels.map((p, i) => ({ ...p, caption: i === 1 ? caption : "The link says robots learn to fold laundry at home." })),
+      realStory,
+    });
+    const ending = "A pasted link says robots learn to fold laundry. Doodle Daily could not open the article to check it.";
+    expect(validateScript(framed("According to the link's headline, robots fold laundry.", ending), unverified)).toEqual([]);
+    expect(validateScript(framed("Robots fold laundry at home.", ending), unverified).join()).toMatch(/panel 2 caption must start with The link says/);
+    expect(validateScript(framed("The link says Bloomberg reports robots fold laundry.", ending), unverified).join()).toMatch(/panel 2 caption must not say anyone reports it/);
+    expect(validateScript(framed("The link says robots fold laundry.", "Robots fold laundry. They are slow."), unverified)).toContain(
+      "realStory must end with: Doodle Daily could not open the article to check it.",
+    );
+  });
+
   test("a legal story is allowed when every caption names the source", () => {
     const legal = { kind: "news" as const, headline: "Regulators investigate Acme chief executive" };
     expect(validateScript(legalScript("Reuters reports"), legal)).toEqual([]);

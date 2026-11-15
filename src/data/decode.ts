@@ -58,6 +58,7 @@ export function decodeComic(raw: unknown): Comic | null {
     order: num(raw.order) ?? 0,
     createdAt: num(raw.createdAt) ?? 0,
     isNew: raw.isNew === true,
+    unverified: raw.unverified === true,
     panels: panels as Panel[],
   };
 }

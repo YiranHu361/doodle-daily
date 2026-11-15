@@ -22,6 +22,7 @@ export const comicDTO = v.object({
   order: v.number(),
   createdAt: v.number(),
   isNew: v.boolean(),
+  unverified: v.boolean(),
   panels: v.array(panelDTO),
 });
 
@@ -61,12 +62,16 @@ export function isVisible(comic: Doc<"comics">): boolean {
   return comic.status !== "failed" && comic.hidden !== true && comic.panels.length === 4;
 }
 
-export async function visibleComics(ctx: QueryCtx, editionId: Doc<"editions">["_id"]) {
+export function isCreatedFor(comic: Doc<"comics">, viewer: string | undefined): boolean {
+  return comic.kind !== "commission" || (comic.owner !== undefined && comic.owner === viewer);
+}
+
+export async function visibleComics(ctx: QueryCtx, editionId: Doc<"editions">["_id"], viewer?: string) {
   const comics = await ctx.db
     .query("comics")
     .withIndex("by_edition_order", (q) => q.eq("editionId", editionId))
     .take(MAX_EDITION_COMICS);
-  return comics.filter((c) => isVisible(c) && c.kind !== "paper-sample");
+  return comics.filter((c) => isVisible(c) && c.kind !== "paper-sample" && isCreatedFor(c, viewer));
 }
 
 export async function toComicDTO(ctx: QueryCtx, comic: Doc<"comics">): Promise<ComicDTO> {
@@ -90,6 +95,7 @@ export async function toComicDTO(ctx: QueryCtx, comic: Doc<"comics">): Promise<C
     order: comic.order,
     createdAt: comic.createdAt,
     isNew: comic.fresh === true,
+    unverified: comic.unverified === true,
     panels,
   };
 }

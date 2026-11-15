@@ -201,12 +201,23 @@
   name it.
 - **Unreadable links** (any non-200 such as wsj.com's 401, a timeout, or no title) fall back to a headline made from
   the URL's last path segment (trailing id like `-30f421ad` and query dropped, hyphens to spaces, first letter
-  capitalised) with exactly one fact, `<Publisher> reports: <headline>.`, and the original link kept. The publisher
+  capitalised) and the original link is kept. wsj.com answers 401 even for made-up paths, so nothing about these is
+  verified: the one fact is `A link a reader pasted from <publisher> is titled: <headline>. Doodle Daily could not
+  open the article to check it.`, the commission and comic carry `unverified: true`, every caption must start with
+  "The link says" or "According to the link's headline" and never say anyone reports it, the Real story must end
+  with "Doodle Daily could not open the article to check it.", and the app shows an UNVERIFIED LINK tag beside the
+  section tag on the card, in the Reader and on the share image. Slug headlines that claim misconduct by a named
+  person are still drawn this way (owner's call), not refused. The publisher
   comes from a small map (WSJ, NYT, Bloomberg, FT, Reuters, Washington Post, The Information, The Economist,
   Business Insider, CNBC), otherwise the bare domain. A slug under four words is refused with `reason: "bad_input"`,
   `refusal: "unreadable_link"` and `message`: Robo could not open that page. Type the headline instead. The slug
   headline goes through the same content rules as a sourced story. `readLink` in `convex/commissions.ts` does this
   for both the Create sheet and Keiki's `commission` tool, which answers `bad_link` only for a short slug.
+- **Created comics are private.** Comics of kind `commission` (Create, and texts to Newsie) store an `owner`: the
+  creating `deviceId`, or `text:<sender>` for Keiki. `editions:today`, `byDate` and `list` take an optional
+  `deviceId` and only include a created comic for its owner, so texted comics show in nobody's app issue and
+  Newsie's `today` tool never leads with one. Draw a fresh one comics stay public. `admin:backfillOwners` set the
+  owner on comics made before this. The server source string is now "Created by a reader".
 - **`isSafeStory`** is `storyRefusal(text, { sourced: true }) === null`, so paper names and niches
   (`papers:create`) get the same looser rules.
 

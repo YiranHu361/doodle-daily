@@ -50,7 +50,7 @@ export function ComicCard({
       <Pressable
         testID={`comicCard_${index}`}
         accessibilityRole="button"
-        accessibilityLabel={`${sectionLabel[comic.section]}: ${comic.title}${read ? ", read" : ""}${comic.kind === "commission" ? ", created for you" : comic.isNew ? ", new" : ""}${sublabel ? `, ${sublabel}` : ""}`}
+        accessibilityLabel={`${sectionLabel[comic.section]}: ${comic.title}${read ? ", read" : ""}${comic.kind === "commission" ? ", created for you" : comic.isNew ? ", new" : ""}${comic.unverified ? ", unverified link" : ""}${sublabel ? `, ${sublabel}` : ""}`}
         onPress={() => void press()}
       >
         <CutBox
@@ -67,7 +67,7 @@ export function ComicCard({
             </View>
           </PaperSheet>
           <View style={lead ? styles.leadText : styles.rowText}>
-            <SectionTag section={comic.section} />
+            <SectionTag section={comic.section} unverified={comic.unverified} />
             <Text style={lead ? styles.leadTitle : styles.rowTitle}>{comic.title}</Text>
             {drawing ? (
               <Text style={styles.meta}>

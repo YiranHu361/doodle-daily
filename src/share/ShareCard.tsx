@@ -44,6 +44,7 @@ export function ShareCard({ comic, onReady }: { comic: Comic; onReady: (view: Co
       <View style={{ height: layout.titleHeight * s, justifyContent: "center" }}>
         <Text style={{ fontFamily: fonts.uiSemiBold, fontSize: 36 * s, color: sectionColor[comic.section] }} allowFontScaling={false}>
           {sectionLabel[comic.section].toUpperCase()}
+          {comic.unverified ? <Text style={{ color: colors.stamp }}>{"  ·  UNVERIFIED LINK"}</Text> : null}
         </Text>
         <Text style={{ fontFamily: fonts.uiSemiBold, fontSize: layout.titleFont * s, lineHeight: layout.titleFont * s * 1.15, color: colors.text.hi }} allowFontScaling={false} numberOfLines={2}>
           {comic.title}

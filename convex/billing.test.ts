@@ -17,6 +17,7 @@ const DAY = 24 * 60 * 60 * 1000;
 
 const INVESTIGATION_URL = "https://news.example.com/acme-ceo-investigated";
 const AFFAIR_URL = "https://news.example.com/acme-ceo-affairs";
+const HARMLESS_URL = "https://www.bloomberg.com/news/articles/robots-learn-to-fold-laundry-at-home-x7k2p9q1";
 const WSJ_URL = "https://www.wsj.com/business/nvidia-is-preparing-to-oust-nvidia-ceo-jensen-huang-30f421ad?mod=e2tw";
 const READABLE_URL = "https://www.reuters.com/business/acme-ships-a-folding-robot-2026-11-15/";
 const ARTICLES: Record<string, string> = {
@@ -177,7 +178,12 @@ describe("commissions", () => {
     expect(row.facts).toContain("The article was published by Example News.");
   });
 
-  test("an unreadable paywalled link falls back to a headline made from its URL, attributed to the publisher", async () => {
+  async function payFor(t: T, commissionId: string, paymentId: string) {
+    await deliver(t, { type: "payment.succeeded", data: { id: paymentId, variant_id: COMMISSION_PLAN, metadata: { kind: "commission", deviceId: DEVICE, commissionId } } });
+    await settle(t, 30_000);
+  }
+
+  test("an unreadable slug about a named executive being ousted is accepted and drawn as an unverified link", async () => {
     const t = convexTest(schema, modules);
     const res = await t.action(api.commissions.start, { deviceId: DEVICE, link: WSJ_URL });
     if (!res.ok) throw new Error(`start failed: ${JSON.stringify(res)}`);
@@ -187,8 +193,32 @@ describe("commissions", () => {
       link: WSJ_URL,
       topic: "Nvidia is preparing to oust nvidia ceo jensen huang",
       headline: "Nvidia is preparing to oust nvidia ceo jensen huang",
-      facts: ["The Wall Street Journal reports: Nvidia is preparing to oust nvidia ceo jensen huang."],
+      facts: ["A link a reader pasted from The Wall Street Journal is titled: Nvidia is preparing to oust nvidia ceo jensen huang. Doodle Daily could not open the article to check it."],
+      unverified: true,
     });
+    await payFor(t, res.commissionId, "pay_wsj");
+    const comic = (await t.query(api.editions.today, { deviceId: DEVICE }))!.comics[0];
+    expect(comic).toMatchObject({ kind: "commission", status: "ready", unverified: true, sourceUrl: WSJ_URL });
+    for (const p of comic.panels) {
+      expect(p.caption).toMatch(/^(The link says|According to the link's headline)/);
+      expect(p.caption).not.toMatch(/reports|Wall Street Journal/);
+    }
+    expect(comic.realStory.endsWith("Doodle Daily could not open the article to check it.")).toBe(true);
+  });
+
+  test("a harmless unreadable slug is drawn in the unverified frame, only for its creator", async () => {
+    const t = convexTest(schema, modules);
+    const res = await t.action(api.commissions.start, { deviceId: DEVICE, link: HARMLESS_URL });
+    if (!res.ok) throw new Error(`start failed: ${JSON.stringify(res)}`);
+    const [row] = await t.run(async (ctx) => ctx.db.query("commissions").collect());
+    expect(row.facts).toEqual([
+      "A link a reader pasted from Bloomberg is titled: Robots learn to fold laundry at home. Doodle Daily could not open the article to check it.",
+    ]);
+    await payFor(t, res.commissionId, "pay_harmless");
+    const comic = (await t.query(api.editions.today, { deviceId: DEVICE }))!.comics[0];
+    expect(comic).toMatchObject({ unverified: true, status: "ready" });
+    expect(comic.panels[0].caption).toBe("The link says Robots learn to fold laundry at home");
+    expect(await t.query(api.editions.today, { deviceId: OTHER })).toBeNull();
   });
 
   test("an unreadable link with a short slug is refused, and slug headlines follow the content rules", async () => {
@@ -242,8 +272,14 @@ describe("commissions", () => {
     await settle(t, 30_000);
     const [mine] = await t.query(api.commissions.mine, { deviceId: DEVICE });
     expect(mine.status).toBe("ready");
-    const today = (await t.query(api.editions.today, {}))!;
-    expect(today.comics[0]).toMatchObject({ _id: mine.comicId, kind: "commission", sourceName: "Commissioned by a reader", status: "ready" });
+    expect(await t.query(api.editions.today, { deviceId: OTHER })).toBeNull();
+    expect(await t.query(api.editions.today, {})).toBeNull();
+    expect(await t.query(api.editions.list, { deviceId: OTHER })).toEqual([]);
+    const today = (await t.query(api.editions.today, { deviceId: DEVICE }))!;
+    expect(await t.query(api.editions.byDate, { date: today.date, deviceId: OTHER })).toBeNull();
+    expect((await t.query(api.editions.byDate, { date: today.date, deviceId: DEVICE }))!.comics).toHaveLength(1);
+    expect(await t.query(api.editions.list, { deviceId: DEVICE })).toHaveLength(1);
+    expect(today.comics[0]).toMatchObject({ _id: mine.comicId, kind: "commission", sourceName: "Created by a reader", status: "ready" });
     expect(today.comics[0].panels).toHaveLength(4);
     expect(await t.query(api.commissions.mine, { deviceId: OTHER })).toEqual([]);
   });
