@@ -1,0 +1,27 @@
+test:
+  metadata:
+    name: "Voice narration toggle"
+    platform: ios
+    tags:
+      - voice
+      - a11y
+  build:
+    name: "doodle-daily"
+  device:
+    model: "iPhone 16"
+    orientation: portrait
+  blocks:
+    - type: instructions
+      step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
+    - type: instructions
+      step_description: "Tap the picture on the first comic card"
+    - type: validation
+      step_description: "A speaker button is visible at the top of the comic, between the progress dots and the '1/4' counter"
+    - type: instructions
+      step_description: "Tap the speaker button"
+    - type: validation
+      step_description: "The speaker icon shows sound waves and a note says Newsie's voice is AI-generated"
+    - type: instructions
+      step_description: "Tap the speaker button again"
+    - type: validation
+      step_description: "The speaker icon shows a cross instead of sound waves"

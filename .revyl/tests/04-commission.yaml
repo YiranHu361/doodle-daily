@@ -1,0 +1,36 @@
+test:
+  metadata:
+    name: "Commission a comic"
+    platform: ios
+    tags:
+      - whop
+      - payments
+  build:
+    name: "doodle-daily"
+  device:
+    model: "iPhone 16"
+    orientation: portrait
+  blocks:
+    - type: instructions
+      step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
+    - type: instructions
+      step_description: "Tap the 'Commission' button at the bottom right of Today"
+    - type: validation
+      step_description: "A sheet titled 'Commission a comic' is showing with a text box"
+    - type: instructions
+      step_description: "Tap the text box and type 'a robot learns to fold laundry'"
+    - type: instructions
+      step_description: "Tap 'Pay $1 and draw it'"
+    - type: instructions
+      step_description: "In the checkout page, enter card number 4242 4242 4242 4242, expiry 12/30, CVC 123, any name and ZIP 94105 if asked, then pay"
+    - type: instructions
+      step_description: "If the browser is still open after paying, tap 'Done' or close it to return to the app"
+    - type: validation
+      step_description: "The commission sheet shows a status line about the comic, such as Robo drawing it, with pulsing dots or a finished message"
+    - type: manual
+      step_type: wait
+      step_description: "90"
+    - type: instructions
+      step_description: "If the commission sheet is still open, close it with the X"
+    - type: validation
+      step_description: "The first comic card on Today has a 'Commissioned' or 'NEW' badge"

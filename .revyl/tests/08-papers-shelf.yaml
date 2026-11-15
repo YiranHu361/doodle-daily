@@ -1,0 +1,27 @@
+test:
+  metadata:
+    name: "Papers shelf and Start your own paper"
+    platform: ios
+    tags:
+      - whop
+      - papers
+  build:
+    name: "doodle-daily"
+  device:
+    model: "iPhone 16"
+    orientation: portrait
+  blocks:
+    - type: instructions
+      step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
+    - type: instructions
+      step_description: "Scroll down to the very end of Today and tap the 'Papers' button"
+    - type: validation
+      step_description: "A sheet titled 'Papers' shows a 'Doodle Daily' card marked as free and a dashed card titled 'Start your own paper'"
+    - type: instructions
+      step_description: "Tap the 'Start your own paper' button"
+    - type: validation
+      step_description: "A form titled 'Start your own paper' shows Name, Niche and Price fields and a 'Create my paper' button"
+    - type: instructions
+      step_description: "Tap 'Back'"
+    - type: validation
+      step_description: "The Papers shelf is showing again"

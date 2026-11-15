@@ -1,0 +1,27 @@
+test:
+  metadata:
+    name: "React to a comic"
+    platform: ios
+    tags:
+      - reactions
+  build:
+    name: "doodle-daily"
+  device:
+    model: "iPhone 16"
+    orientation: portrait
+  blocks:
+    - type: instructions
+      step_description: "If an intro card titled 'The news, drawn in crayon' is showing, tap 'Skip' at the top right."
+    - type: instructions
+      step_description: "Tap the picture on the first comic card"
+    - type: extraction
+      step_description: "The number shown on the first (leftmost) reaction button at the bottom of the screen"
+      variable_name: "before"
+    - type: instructions
+      step_description: "Tap the first (leftmost) reaction button at the bottom of the screen"
+    - type: validation
+      step_description: "The first reaction button now shows a count one higher than {{before}} and has a coloured glowing border"
+    - type: instructions
+      step_description: "Tap the first (leftmost) reaction button again"
+    - type: validation
+      step_description: "The first reaction button shows {{before}} again and no longer has the coloured glowing border"
