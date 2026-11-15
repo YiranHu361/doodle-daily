@@ -35,7 +35,14 @@ const REFUSAL_TOPICS = {
   needs_source: "an unsourced claim",
 } as const;
 
-export function validateScript(script: unknown, opts: { kind: "news" | "meme" | "commission"; headline: string; source?: string }): string[] {
+export const UNVERIFIED_SENTENCE = "Doodle Daily could not open the article to check it.";
+const LINK_FRAME = /^(?:the link says|according to the link['\u2019]s headline)\b/i;
+const PUBLISHER_CLAIM = /\b(?:reports?|reported|reporting)\b|\baccording to (?!the link['\u2019]s headline)/i;
+
+export function validateScript(
+  script: unknown,
+  opts: { kind: "news" | "meme" | "commission"; headline: string; source?: string; unverified?: boolean },
+): string[] {
   const errors: string[] = [];
   const s = script as Partial<Script> | null;
   if (!s || typeof s !== "object") return ["answer is not an object"];
@@ -74,6 +81,14 @@ export function validateScript(script: unknown, opts: { kind: "news" | "meme" | 
     if (PEOPLE.test(sceneWithoutCast)) errors.push(`panel ${n} scene shows a person who is not a cast member`);
   });
   const words = [s.title, s.realStory, ...s.panels.map((p) => `${p?.caption ?? ""} ${p?.scene ?? ""}`)].filter((t) => typeof t === "string").join(" ");
+  if (opts.unverified) {
+    s.panels.forEach((p, i) => {
+      const caption = typeof p?.caption === "string" ? p.caption.trim() : "";
+      if (!LINK_FRAME.test(caption)) errors.push(`panel ${i + 1} caption must start with The link says or According to the link's headline, because nobody could open the article`);
+      else if (PUBLISHER_CLAIM.test(caption)) errors.push(`panel ${i + 1} caption must not say anyone reports it; only say what the link's headline says`);
+    });
+    if (typeof s.realStory === "string" && !s.realStory.trim().endsWith(UNVERIFIED_SENTENCE)) errors.push(`realStory must end with: ${UNVERIFIED_SENTENCE}`);
+  }
   const refusal = storyRefusal(words, { sourced: true });
   if (refusal) errors.push(`the comic touches a banned topic (${REFUSAL_TOPICS[refusal]})`);
   else if (isLegalStory(`${opts.headline} ${words}`)) {

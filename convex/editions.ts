@@ -13,12 +13,12 @@ async function oldestOpenDate(ctx: QueryCtx, deviceId: string | undefined): Prom
 }
 
 export const today = query({
-  args: {},
+  args: { deviceId: v.optional(v.string()) },
   returns: v.union(editionDTO, v.null()),
-  handler: async (ctx): Promise<EditionDTO | null> => {
+  handler: async (ctx, { deviceId }): Promise<EditionDTO | null> => {
     const recent = await ctx.db.query("editions").withIndex("by_date").order("desc").take(TODAY_LOOKBACK);
     for (const edition of recent) {
-      const comics = await visibleComics(ctx, edition._id);
+      const comics = await visibleComics(ctx, edition._id, deviceId);
       if (comics.length > 0) return toEditionDTO(ctx, edition, comics);
     }
     return null;
@@ -34,7 +34,7 @@ export const byDate = query({
       .withIndex("by_date", (q) => q.eq("date", date))
       .unique();
     if (!edition) return null;
-    const comics = await visibleComics(ctx, edition._id);
+    const comics = await visibleComics(ctx, edition._id, deviceId);
     if (comics.length === 0) return null;
     if (edition.date < (await oldestOpenDate(ctx, deviceId))) {
       return { _id: edition._id, date: edition.date, number: edition.number, status: edition.status, comics: [], locked: true };
@@ -51,7 +51,7 @@ export const list = query({
     const editions = await ctx.db.query("editions").withIndex("by_date").order("desc").take(LIST_LIMIT);
     const summaries: EditionSummaryDTO[] = [];
     for (const edition of editions) {
-      const comics = await visibleComics(ctx, edition._id);
+      const comics = await visibleComics(ctx, edition._id, deviceId);
       if (comics.length === 0) continue;
       const coverId = comics.find((c) => c.panels[0].imageId)?.panels[0].imageId;
       summaries.push({

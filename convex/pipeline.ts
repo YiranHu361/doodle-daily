@@ -69,6 +69,8 @@ const storyInput = v.object({
   score: v.number(),
   whyFunny: v.optional(v.string()),
   format: v.optional(v.string()),
+  owner: v.optional(v.string()),
+  unverified: v.optional(v.boolean()),
 });
 type StoryInput = typeof storyInput.type;
 
@@ -489,6 +491,7 @@ export async function writeValidScript(ctx: ActionCtx, provider: ScriptProvider,
     headline: story.kind === "meme" ? (story.whyFunny ?? story.headline) : story.headline,
     facts: story.facts,
     formats: formatDescription ? [formatDescription] : [],
+    unverified: story.unverified === true,
   };
   let repair: { previous: unknown; errors: string[] } | undefined;
   for (let round = 0; round < 2; round++) {
@@ -498,7 +501,7 @@ export async function writeValidScript(ctx: ActionCtx, provider: ScriptProvider,
       repair = { previous: null, errors: [result.reason] };
       continue;
     }
-    const errors = validateScript(result.script, { kind: story.kind === "meme" ? "meme" : "news", headline: story.headline });
+    const errors = validateScript(result.script, { kind: story.kind === "meme" ? "meme" : "news", headline: story.headline, unverified: story.unverified === true });
     if (errors.length === 0) return cleanScript(result.script);
     repair = { previous: result.script, errors };
   }
@@ -570,6 +573,8 @@ export const startComic = internalMutation({
       createdAt: now,
       deadline: now + COMIC_DEADLINE_MS,
       panels: script.panels.map((p) => ({ scene: p.scene, cast: p.cast, caption: p.caption })),
+      owner: story.owner,
+      unverified: story.unverified || undefined,
     });
     if (edition.status !== "building") await ctx.db.patch(edition._id, { status: "building" });
     for (let index = 0; index < 4; index++) await ctx.scheduler.runAfter(0, internal.pipeline.drawPanel, { comicId, index, attempt: 1 });
@@ -932,7 +937,15 @@ const briefResult = v.union(
 type BriefResult = typeof briefResult.type;
 
 export const drawFromBrief = internalAction({
-  args: { headline: v.string(), facts: v.array(v.string()), sourceName: v.string(), sourceUrl: v.string(), kind: comicKind },
+  args: {
+    headline: v.string(),
+    facts: v.array(v.string()),
+    sourceName: v.string(),
+    sourceUrl: v.string(),
+    kind: comicKind,
+    owner: v.optional(v.string()),
+    unverified: v.optional(v.boolean()),
+  },
   returns: briefResult,
   handler: async (ctx, args): Promise<BriefResult> => {
     const headline = args.headline.trim();
@@ -949,9 +962,11 @@ export const drawFromBrief = internalAction({
           headline: cut(headline, 200),
           facts,
           itemIds: [],
-          sourceName: cut(args.sourceName.trim() || "Commissioned by a reader", 120),
+          sourceName: cut(args.sourceName.trim() || "Created by a reader", 120),
           sourceUrl: args.sourceUrl.trim(),
           score: 0,
+          owner: args.owner,
+          unverified: args.unverified || undefined,
         },
       ],
     });

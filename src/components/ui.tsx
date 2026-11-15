@@ -78,14 +78,25 @@ export function SecondaryButton({
   );
 }
 
-export function SectionTag({ section }: { section: Section }) {
+export function SectionTag({ section, unverified }: { section: Section; unverified?: boolean }) {
   const color = sectionColor[section];
-  return (
+  const tag = (
     <CutBox cut={cut.chip} fill={colors.surface[2]} stroke={color} strokeWidth={1} style={styles.tag}>
       <Text style={[styles.tagText, { color }]} maxFontSizeMultiplier={1.4}>
         {sectionLabel[section].toUpperCase()}
       </Text>
     </CutBox>
+  );
+  if (!unverified) return tag;
+  return (
+    <View style={styles.tagRow}>
+      {tag}
+      <CutBox cut={cut.chip} fill={colors.surface[2]} stroke={colors.stamp} strokeWidth={1} style={styles.tag}>
+        <Text style={[styles.tagText, { color: colors.stamp }]} maxFontSizeMultiplier={1.4} accessibilityLabel="Unverified link">
+          UNVERIFIED LINK
+        </Text>
+      </CutBox>
+    </View>
   );
 }
 
@@ -158,6 +169,7 @@ const styles = StyleSheet.create({
   square: { width: 44, height: 44 },
   secondaryText: { ...type.button, color: colors.text.hi },
   tag: { alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 3 },
+  tagRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   tagText: { fontFamily: type.chip.fontFamily, fontSize: 12, letterSpacing: 1 },
   stamp: {
     position: "absolute",

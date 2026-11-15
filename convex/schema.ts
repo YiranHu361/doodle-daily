@@ -79,6 +79,8 @@ export default defineSchema({
     score: v.number(),
     whyFunny: v.optional(v.string()),
     format: v.optional(v.string()),
+    owner: v.optional(v.string()),
+    unverified: v.optional(v.boolean()),
     used: v.boolean(),
     claimedAt: v.optional(v.number()),
     createdAt: v.number(),
@@ -105,6 +107,8 @@ export default defineSchema({
     panels: v.array(panel),
     panelAudioIds: v.optional(v.array(v.union(v.id("_storage"), v.null()))),
     realStoryAudioId: v.optional(v.id("_storage")),
+    owner: v.optional(v.string()),
+    unverified: v.optional(v.boolean()),
   })
     .index("by_edition_order", ["editionId", "order"])
     .index("by_status_deadline", ["status", "deadline"]),
@@ -193,6 +197,7 @@ export default defineSchema({
     comicId: v.optional(v.id("comics")),
     refundId: v.optional(v.string()),
     refundOwed: v.optional(v.boolean()),
+    unverified: v.optional(v.boolean()),
     error: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
@@ -207,6 +212,7 @@ export default defineSchema({
     link: v.optional(v.string()),
     headline: v.string(),
     facts: v.array(v.string()),
+    unverified: v.optional(v.boolean()),
     status: v.union(v.literal("drawing"), v.literal("ready"), v.literal("failed")),
     reason: v.optional(textFailure),
     error: v.optional(v.string()),

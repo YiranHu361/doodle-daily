@@ -16,6 +16,7 @@ export type Comic = {
   order: number;
   createdAt: number;
   isNew: boolean;
+  unverified?: boolean;
   panels: Panel[];
 };
 

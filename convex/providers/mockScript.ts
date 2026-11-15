@@ -1,3 +1,4 @@
+import { UNVERIFIED_SENTENCE } from "../lib/script";
 import type { MemePickResult, PickResult, Script, ScriptInput, ScriptProvider, ScriptResult } from "./types";
 
 const SECTION_CAST: Record<ScriptInput["section"], string[]> = {
@@ -31,8 +32,10 @@ export function mockScript(input: ScriptInput): Script {
   const [a, b] = SECTION_CAST[input.section];
   const facts = input.facts.flatMap(sentences);
   const pool = facts.length > 0 ? facts : [input.headline];
-  const captions = [0, 1, 2, 3].map((i) => words(pool[i % pool.length], 15));
-  const story = pool.slice(0, input.kind === "meme" ? 1 : 2);
+  const captions = [0, 1, 2, 3].map((i) =>
+    input.unverified ? words(`The link says ${input.headline.replace(/[.!?]+$/, "")}`, 15) : words(pool[i % pool.length], 15),
+  );
+  const story = input.unverified ? [`A pasted link is titled ${input.headline.replace(/[.!?]+$/, "")}.`, UNVERIFIED_SENTENCE] : pool.slice(0, input.kind === "meme" ? 1 : 2);
   while (story.length < (input.kind === "meme" ? 1 : 2)) story.push(input.headline + ".");
   return {
     title: words(input.headline, 6).replace(/\.$/, ""),

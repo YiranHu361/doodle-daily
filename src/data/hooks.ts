@@ -41,7 +41,8 @@ function useCachedIssue(): Edition | null {
 export function useToday(enabled = true): ScreenState<Edition> {
   const { fixtures } = useFlags();
   const version = useFixtureVersion();
-  const raw = useQuery(api.editions.today, enabled && !fixtures ? {} : "skip");
+  const deviceId = useDeviceId();
+  const raw = useQuery(api.editions.today, enabled && !fixtures && deviceId ? { deviceId } : "skip");
   const cached = useCachedIssue();
   const conn = useConnection();
   const live = useMemo(() => {

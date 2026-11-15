@@ -107,7 +107,8 @@ describe("keiki tool endpoint", () => {
     const texted = (await t.run((ctx) => ctx.db.query("textCommissions").collect())).find((row) => row.link === wsj);
     expect(texted).toMatchObject({
       headline: "Nvidia is preparing to oust nvidia ceo jensen huang",
-      facts: ["The Wall Street Journal reports: Nvidia is preparing to oust nvidia ceo jensen huang."],
+      facts: ["A link a reader pasted from The Wall Street Journal is titled: Nvidia is preparing to oust nvidia ceo jensen huang. Doodle Daily could not open the article to check it."],
+      unverified: true,
     });
     expect((await callTool(t, "commission", { request: "   " })).body).toMatchObject({ ok: false, reason: "bad_input" });
   });
@@ -154,6 +155,17 @@ describe("keiki tool endpoint", () => {
     const t = convexTest(schema, modules);
     expect((await callTool(t, "today", {})).body).toMatchObject({ status: "failed" });
     await callTool(t, "commission", { request: "coffee prices hit a record high" });
+    await settleAll(t);
+    expect((await callTool(t, "today", {})).body).toMatchObject({ status: "failed" });
+    const [texted] = await t.run((ctx) => ctx.db.query("comics").collect());
+    expect(texted).toMatchObject({ kind: "commission", owner: `text:${PHONE}` });
+    await t.action(internal.pipeline.drawFromBrief, {
+      headline: "Coffee prices hit a record high",
+      facts: ["Coffee prices hit a record high this week.", "Beans cost more than ever."],
+      sourceName: "Example News",
+      sourceUrl: "https://news.example.com/coffee",
+      kind: "news",
+    });
     await settleAll(t);
     const today = (await callTool(t, "today", {})).body as { status: string; title: string; panels: unknown[]; appLink: string };
     expect(today.status).toBe("ready");

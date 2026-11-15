@@ -2,11 +2,34 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { pacificDate } from "./lib/dates";
+import { textOwner } from "./keiki";
 import { COMIC_DEADLINE_MS, deleteComic, imageCap, settle } from "./pipeline";
 
 export const IMAGE_USD = 0.06;
 export const INPUT_USD_PER_MTOK = 4;
 export const OUTPUT_USD_PER_MTOK = 20;
+
+export const backfillOwners = internalMutation({
+  args: {},
+  returns: v.object({ created: v.number(), texted: v.number() }),
+  handler: async (ctx) => {
+    let created = 0;
+    let texted = 0;
+    for (const row of await ctx.db.query("commissions").collect()) {
+      const comic = row.comicId ? await ctx.db.get(row.comicId) : null;
+      if (!comic || comic.owner) continue;
+      await ctx.db.patch(comic._id, { owner: row.deviceId });
+      created++;
+    }
+    for (const row of await ctx.db.query("textCommissions").collect()) {
+      const comic = row.comicId ? await ctx.db.get(row.comicId) : null;
+      if (!comic || comic.owner) continue;
+      await ctx.db.patch(comic._id, { owner: textOwner(row.sender) });
+      texted++;
+    }
+    return { created, texted };
+  },
+});
 
 export const listDay = internalQuery({
   args: { date: v.string() },
