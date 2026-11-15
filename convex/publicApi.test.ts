@@ -5,6 +5,7 @@ const PUBLIC_ALLOW_LIST = [
   "editions:byDate",
   "editions:list",
   "editions:today",
+  "pipeline:drawFreshOne",
   "reactions:counts",
   "reactions:toggle",
 ];

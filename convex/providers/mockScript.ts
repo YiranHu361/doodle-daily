@@ -1,4 +1,4 @@
-import type { Script, ScriptInput, ScriptProvider, ScriptResult } from "./types";
+import type { MemePickResult, PickResult, Script, ScriptInput, ScriptProvider, ScriptResult } from "./types";
 
 const SECTION_CAST: Record<ScriptInput["section"], string[]> = {
   tech: ["Robo", "Boss Blob"],
@@ -49,5 +49,28 @@ export const mockScriptProvider: ScriptProvider = {
   name: "mock",
   async writeScript(input: ScriptInput): Promise<ScriptResult> {
     return { ok: true, script: mockScript(input) };
+  },
+  async pickStories(input): Promise<PickResult> {
+    return {
+      ok: true,
+      picks: input.items.slice(0, input.n).map((it, i) => ({
+        itemIds: [it.id],
+        headline: it.title,
+        whyFunny: "It is easy to draw.",
+        score: 9 - i,
+      })),
+    };
+  },
+  async pickMemes(input): Promise<MemePickResult> {
+    return {
+      ok: true,
+      picks: input.trends.slice(0, 4).map((t, i) => ({
+        topic: t.topic,
+        theJoke: `Everyone online is talking about ${t.topic} at once.`,
+        format: input.formats[i % Math.max(1, input.formats.length)] ?? null,
+        sourceUrls: t.posts.slice(0, 1).map((p) => p.url),
+        score: 8 - i,
+      })),
+    };
   },
 };

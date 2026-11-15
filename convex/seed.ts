@@ -4,7 +4,7 @@ import type { Id } from "./_generated/dataModel";
 import { internalAction, internalMutation, type MutationCtx } from "./_generated/server";
 import { addDays, pacificDate } from "./lib/dates";
 import { comicKind, section } from "./schema";
-import { getImageProvider, getScriptProvider, panelPrompt, type Script } from "./providers";
+import { mockImageProvider, mockScriptProvider, panelPrompt, type Script } from "./providers";
 import { TODAY_STORIES, YESTERDAY_STORIES, type SeedStory } from "./seedData";
 
 const COMIC_DEADLINE_MS = 10 * 60 * 1000;
@@ -154,8 +154,8 @@ export const run = internalAction({
   handler: async (ctx, args): Promise<{ today: string; written: string[] }> => {
     const startedAt = Date.now();
     const today = pacificDate(startedAt);
-    const scripts = getScriptProvider();
-    const images = getImageProvider(args.fast ? { minDelayMs: 0, maxDelayMs: 0, size: 16 } : {});
+    const scripts = mockScriptProvider;
+    const images = mockImageProvider(args.fast ? { minDelayMs: 0, maxDelayMs: 0, size: 16 } : {});
     const written: string[] = [];
     const days: [string, SeedStory[]][] = [
       [addDays(today, -1), YESTERDAY_STORIES],
