@@ -23,6 +23,10 @@ export function isBusy(state: DrawState): boolean {
   return state.phase === "requesting" || state.phase === "drawing";
 }
 
+export function drawingInLead(state: DrawState): boolean {
+  return state.phase === "requesting" || (state.phase === "drawing" && !state.seen);
+}
+
 export function drawReducer(state: DrawState, event: DrawEvent): DrawState {
   switch (event.type) {
     case "start":

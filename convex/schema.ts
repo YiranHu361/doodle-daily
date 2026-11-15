@@ -111,6 +111,8 @@ export default defineSchema({
     realStoryAudioId: v.optional(v.id("_storage")),
     owner: v.optional(v.string()),
     unverified: v.optional(v.boolean()),
+    sponsored: v.optional(v.boolean()),
+    replacedAt: v.optional(v.number()),
   })
     .index("by_edition_order", ["editionId", "order"])
     .index("by_status_deadline", ["status", "deadline"])

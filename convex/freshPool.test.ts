@@ -1,10 +1,11 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import schema from "./schema";
 import { modules } from "./test.setup";
 import { REVEAL_DELAY_MS } from "./freshPool";
+import { pacificDate } from "./lib/dates";
 import { SLOW_NEWS_SOURCE } from "./pipeline";
 import { setProvidersForTests } from "./providers";
 
@@ -181,9 +182,118 @@ describe("freshPool", () => {
     const results = [await draw(t), await draw(t), await draw(t)];
     expect(results.every((r) => r.ok)).toBe(true);
     await settleAll(t, 10_000);
-    const today = (await todayIds(t)).slice(0, 3);
-    expect(today.sort()).toEqual(results.map((r) => (r as { comicId: string }).comicId).sort());
+    expect(await todayIds(t)).toEqual([(results[2] as { comicId: string }).comicId]);
     expect((await draw(t)).ok).toBe(true);
+  });
+});
+
+const PANEL = { scene: "Robo waves.", caption: "Robo waves.", cast: ["Robo"] };
+
+async function seedToday(t: T, comics: Partial<Doc<"comics">>[]): Promise<Id<"comics">[]> {
+  return await t.run(async (ctx) => {
+    const now = Date.now();
+    const editionId = await ctx.db.insert("editions", { date: pacificDate(now), number: 1, status: "published", createdAt: now });
+    const ids: Id<"comics">[] = [];
+    for (const [i, extra] of comics.entries()) {
+      ids.push(
+        await ctx.db.insert("comics", {
+          editionId,
+          section: "tech",
+          kind: "news",
+          title: `Seeded comic ${i}`,
+          realStory: "Seeded.",
+          sourceName: "Example",
+          sourceUrl: `https://example.com/seeded/${i}`,
+          status: "ready",
+          order: i,
+          createdAt: now,
+          deadline: now + DAY_MS,
+          panels: [PANEL, PANEL, PANEL, PANEL],
+          ...extra,
+        }),
+      );
+    }
+    return ids;
+  });
+}
+
+const comicIdOf = (res: Awaited<ReturnType<typeof draw>>) => {
+  expect(res.ok).toBe(true);
+  return (res as { comicId: Id<"comics"> }).comicId;
+};
+
+describe("Draw a fresh one replaces the top comic", () => {
+  test("the revealed comic takes the lead's place; the old lead leaves Today but stays readable by id", async () => {
+    process.env.DEMO_MODE = "1";
+    const t = convexTest(schema, modules);
+    const seeded = await seedToday(t, [{}, {}, {}]);
+    await fillPool(t);
+    expect(await todayIds(t)).toEqual(seeded);
+    const fresh = comicIdOf(await draw(t));
+    await settleAll(t, 10_000);
+    expect(await todayIds(t)).toEqual([fresh, seeded[1], seeded[2]]);
+    const date = pacificDate(Date.now());
+    expect((await t.query(api.editions.byDate, { date }))!.comics).toHaveLength(3);
+    expect((await t.query(api.editions.list, {}))[0].comicCount).toBe(3);
+    const old = (await t.run((ctx) => ctx.db.get(seeded[0])))!;
+    expect(old.replacedAt).toBeDefined();
+    expect(old.hidden).toBeUndefined();
+    await t.mutation(api.reactions.toggle, { comicId: seeded[0], deviceId: DEVICE, kind: "lol" });
+    expect(await t.query(api.reactions.counts, { comicId: seeded[0], deviceId: DEVICE })).toMatchObject({ lol: 1, mine: "lol" });
+  });
+
+  test("three draws in a row keep the count unchanged, each new comic replacing the last", async () => {
+    process.env.DEMO_MODE = "1";
+    const t = convexTest(schema, modules);
+    const seeded = await seedToday(t, [{}, {}, {}]);
+    await fillPool(t);
+    for (let i = 0; i < 3; i++) {
+      const fresh = comicIdOf(await draw(t));
+      await settleAll(t, 10_000);
+      expect(await todayIds(t)).toEqual([fresh, seeded[1], seeded[2]]);
+    }
+  });
+
+  test("an owned, commission or sponsored comic on top is never replaced; the first replaceable one below is", async () => {
+    process.env.DEMO_MODE = "1";
+    const t = convexTest(schema, modules);
+    const seeded = await seedToday(t, [{ sponsored: true }, { kind: "commission", owner: DEVICE }, { owner: DEVICE }, {}, {}]);
+    await fillPool(t);
+    const fresh = comicIdOf(await draw(t));
+    await settleAll(t, 10_000);
+    const ids = ((await t.query(api.editions.today, { deviceId: DEVICE }))?.comics ?? []).map((c) => c._id);
+    expect(ids).toEqual([seeded[0], seeded[1], seeded[2], fresh, seeded[4]]);
+    const kept = await t.run((ctx) => Promise.all(seeded.slice(0, 3).map((id) => ctx.db.get(id))));
+    expect(kept.every((c) => c?.replacedAt === undefined)).toBe(true);
+  });
+
+  test("with an empty pool the live draw lands in the lead slot at once", async () => {
+    const t = convexTest(schema, modules);
+    const seeded = await seedToday(t, [{}, {}]);
+    await addStories(t, ["Bank opens branch on a train"]);
+    const fresh = comicIdOf(await draw(t));
+    expect(await todayIds(t)).toEqual([fresh, seeded[1]]);
+    await settleAll(t, 10_000);
+    expect(await todayIds(t)).toEqual([fresh, seeded[1]]);
+  });
+
+  test("the slow-news-day fallback lands in the lead slot too", async () => {
+    const t = convexTest(schema, modules);
+    const seeded = await seedToday(t, [{}, {}]);
+    const fresh = comicIdOf(await draw(t));
+    await settleAll(t, 10_000);
+    expect(await todayIds(t)).toEqual([fresh, seeded[1]]);
+    expect((await t.run((ctx) => ctx.db.get(fresh)))!.sourceName).toBe(SLOW_NEWS_SOURCE);
+  });
+
+  test("a live draw that fails gives the lead back", async () => {
+    const t = convexTest(schema, modules);
+    const seeded = await seedToday(t, [{}, {}]);
+    await addStories(t, ["Bank opens branch on a train"]);
+    const fresh = comicIdOf(await draw(t));
+    await t.run((ctx) => ctx.db.patch(fresh, { deadline: Date.now() - 1 }));
+    await t.mutation(internal.pipeline.checkDeadline, { comicId: fresh });
+    expect(await todayIds(t)).toEqual(seeded);
   });
 });
 

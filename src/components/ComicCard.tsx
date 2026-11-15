@@ -83,15 +83,16 @@ export function ComicCard({
   );
 }
 
-export function DrawingCard() {
+export function DrawingCard({ lead = false }: { lead?: boolean }) {
+  const { width } = useWindowDimensions();
   return (
-    <Animated.View entering={FadeIn.duration(200)} accessible accessibilityLabel={`${copy.drawingCard}, ${copy.panelsOf(0)}`}>
-      <CutBox cut={cut.card} fill={colors.surface[1]} stroke={colors.neon.volt} dashed style={styles.row}>
-        <PaperSheet seed={99} padding={6} backlight={colors.neon.volt} backlightRadius={8}>
-          <Scribble size={84} />
+    <Animated.View testID="drawingCard" entering={FadeIn.duration(200)} layout={LinearTransition.duration(200)} accessible accessibilityLabel={`${copy.drawingCard}, ${copy.panelsOf(0)}`}>
+      <CutBox cut={cut.card} fill={colors.surface[1]} stroke={colors.neon.volt} dashed style={lead ? styles.lead : styles.row}>
+        <PaperSheet seed={99} padding={lead ? 8 : 6} backlight={colors.neon.volt} backlightRadius={lead ? 16 : 8}>
+          <Scribble size={lead ? width - space.margin * 2 - 24 - 16 : 84} />
         </PaperSheet>
-        <View style={styles.rowText}>
-          <Text style={styles.rowTitle}>{copy.drawingCard}</Text>
+        <View style={lead ? styles.leadText : styles.rowText}>
+          <Text style={lead ? styles.leadTitle : styles.rowTitle}>{copy.drawingCard}</Text>
           <Text style={styles.meta}>{copy.panelsOf(0)}</Text>
         </View>
       </CutBox>

@@ -66,12 +66,22 @@ export function isCreatedFor(comic: Doc<"comics">, viewer: string | undefined): 
   return comic.kind !== "commission" || (comic.owner !== undefined && comic.owner === viewer);
 }
 
+export function isReplaceable(comic: Doc<"comics">): boolean {
+  return (
+    isVisible(comic) &&
+    comic.replacedAt === undefined &&
+    (comic.kind === "news" || comic.kind === "meme") &&
+    comic.owner === undefined &&
+    comic.sponsored !== true
+  );
+}
+
 export async function visibleComics(ctx: QueryCtx, editionId: Doc<"editions">["_id"], viewer?: string) {
   const comics = await ctx.db
     .query("comics")
     .withIndex("by_edition_order", (q) => q.eq("editionId", editionId))
     .take(MAX_EDITION_COMICS);
-  return comics.filter((c) => isVisible(c) && c.kind !== "paper-sample" && isCreatedFor(c, viewer));
+  return comics.filter((c) => isVisible(c) && c.replacedAt === undefined && c.kind !== "paper-sample" && isCreatedFor(c, viewer));
 }
 
 export async function toComicDTO(ctx: QueryCtx, comic: Doc<"comics">): Promise<ComicDTO> {

@@ -13,6 +13,13 @@ export function orderForToday(comics: readonly Comic[], pinnedId: string | null)
   return [...top, ...comics.filter((c) => !pinned(c))];
 }
 
+export const DRAWING_SLOT = "drawing";
+export type TodaySlot = Comic | typeof DRAWING_SLOT;
+
+export function withDrawingLead(comics: readonly Comic[], drawing: boolean): TodaySlot[] {
+  return drawing ? [DRAWING_SLOT, ...comics.slice(1)] : [...comics];
+}
+
 export function stillDrawing(comics: readonly Comic[]): number {
   return comics.filter((c) => c.status !== "ready").length;
 }

@@ -20,8 +20,8 @@ import { Banner, SecondaryButton } from "../src/components/ui";
 import { ComboFreeze, PapersShelf, PaywallSheet, usePlus } from "../src/billing";
 import { now, formatIssueDate, pacificDate } from "../src/data/clock";
 import { restartColdStartWindow } from "../src/data/connectionHooks";
-import { drawMessage, type DrawFailure } from "../src/data/drawFlow";
-import { filterComics, orderForToday, stillDrawing, type Chip } from "../src/data/filter";
+import { drawingInLead, drawMessage, type DrawFailure } from "../src/data/drawFlow";
+import { DRAWING_SLOT, filterComics, orderForToday, stillDrawing, withDrawingLead, type Chip } from "../src/data/filter";
 import { useDrawFresh, useToday } from "../src/data/hooks";
 import { newsieSmsUrl } from "../src/data/newsie";
 import type { Comic, Edition } from "../src/data/types";
@@ -114,8 +114,8 @@ function TodayScreen() {
   const draw = useDrawFresh(comics, { onFailed, onDone });
 
   const freshId = draw.state.phase === "drawing" ? draw.state.comicId : null;
-  const showDrawingCard = draw.state.phase === "requesting" || (draw.state.phase === "drawing" && !draw.state.seen);
-  const visible = useMemo(() => filterComics(orderForToday(comics, freshId), chip), [comics, freshId, chip]);
+  const showDrawingCard = drawingInLead(draw.state);
+  const visible = useMemo(() => withDrawingLead(filterComics(orderForToday(comics, freshId), chip), showDrawingCard), [comics, freshId, chip, showDrawingCard]);
   const drawingCount = stillDrawing(comics);
   const olderIssue = edition !== null && edition.date < pacificDate(now());
 
@@ -152,13 +152,16 @@ function TodayScreen() {
         {today.offline ? <Banner testID="offlineBanner" tone="offline" text={copy.offline} /> : null}
         {olderIssue && edition ? <Banner testID="olderIssueBanner" tone="warn" text={copy.olderIssue(edition.number)} /> : null}
         {drawingCount > 0 ? <Banner testID="buildingBanner" text={copy.building(drawingCount)} /> : null}
-        {showDrawingCard ? <DrawingCard /> : null}
         {visible.length === 0 ? (
           <EmptyState title={copy.emptySection} pose="idle" testID="emptySection" />
         ) : (
-          visible.map((c, i) => (
-            <ComicCard key={c._id} comic={c} index={i} lead={i === 0} read={isRead(c._id)} fresh={c._id === freshId} onPress={() => open(c)} />
-          ))
+          visible.map((c, i) =>
+            c === DRAWING_SLOT ? (
+              <DrawingCard key={DRAWING_SLOT} lead={i === 0} />
+            ) : (
+              <ComicCard key={c._id} comic={c} index={i} lead={i === 0} read={isRead(c._id)} fresh={c._id === freshId} onPress={() => open(c)} />
+            ),
+          )
         )}
         <View style={styles.footer}>
           <SecondaryButton testID="archiveButton" label={copy.backIssues} onPress={() => router.push("/archive")} style={styles.footerButton} />
