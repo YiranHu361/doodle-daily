@@ -1,14 +1,22 @@
 # Thread 8: Text Newsie a link (Keiki, iMessage)
 
-Start from the latest `main` (threads 1, 2 and 3 are merged). Read `docs/BRIEF.md`,
-`docs/LESSONS.md` and `docs/WHOP.md`. Runs in parallel with thread 5 (Whop) and
-thread 7 (voice). The project variable `KEIKI_API_KEY` is set; never print it.
+Start from the latest `main` (threads 1 to 4 and voice are merged). Read
+`docs/KEIKI-FINDINGS.md` first: it records what was really tried against our Keiki
+organization and it wins over the rest of this file. Then `docs/BRIEF.md` and
+`docs/LESSONS.md`. Runs in parallel with thread 5 (Whop).
 
-First read, in this order: https://consumermobilehackathon.com/keiki (it has
-ready-made setup prompts; follow them), https://onkeiki.com/setup.md,
-https://onkeiki.com/llms.txt and the docs it links (channels, cloud agents, tools,
-files, notices). Where those disagree with this file, they win; write the
-difference in `NOTES.md`.
+State of play:
+- Keiki is connected to this Capy project over its MCP server (no key needed for
+  setup). The agent already exists: `external_ref: doodle-daily-newsie`. Update it
+  with `deploy_agent`; do not create a second one.
+- When the findings were written the organization was in sandbox mode (no tools,
+  no shared number). It has since been unlocked with the hackathon code. **First
+  thing to do: re-run the probes** (a webhook tool call, `get_agents_shared_line`,
+  `send_file`) and record what works now. If tools still do not run, stop and tell
+  me exactly what Keiki says is missing.
+- `KEIKI_API_KEY` is a project variable (a live key; never print it). Set it on the
+  Convex deployment with `npx convex env set`. Our backend needs it only for the
+  notice endpoint.
 
 ## What the person gets
 
@@ -28,9 +36,11 @@ lead comic the same way. Anything else gets a one-line friendly nudge on what to
 2. **Backend, new file `convex/keiki.ts`** plus two routes in `convex/http.ts`
    (thread 5 also adds a route there: add only your own lines and rebase if it
    moved):
-   - `POST /keiki/commission`: input a URL or topic and the sender's id. Check the
-     request really comes from Keiki (signature or shared secret, as their docs
-     describe; store the secret with `npx convex env set`). Limit each sender to 2
+   - `POST /keiki/<secret>/commission`: input a URL or topic and the sender's id
+     (`context.userId` or `context.phone`). Keiki documents no signature for cloud
+     webhook tools, so put a long random secret in the URL path, store it with
+     `npx convex env set KEIKI_TOOL_SECRET`, and refuse any request without it
+     (compare in constant time). The same goes for the other two routes. Limit each sender to 2
      comics a day and count pictures against the existing daily image cap. Start
      the comic through the pipeline's internal entry point for a brief
      (`pipeline:drawFromBrief`, from thread 2) with `kind: "commission"`, and
@@ -39,18 +49,21 @@ lead comic the same way. Anything else gets a one-line friendly nudge on what to
      friendly reason, or `ready` with the title, the four picture URLs and captions,
      the real story, the source link and the app link.
    - `POST /keiki/today`: today's lead comic in the same `ready` shape.
-   - If Keiki tool calls time out before 30 seconds, use whichever of these their
-     docs support: the tool returns quickly and the agent checks status again, or
-     our backend pushes the result with Keiki's notice endpoint when the comic is
-     ready. Pick the one that works on the shared number and say which.
+   - Delivery: the commission tool returns fast with an id and the agent says
+     "On it". When the comic is ready (or has failed), our backend calls Keiki's
+     notice endpoint for that conversation (`POST /api/v1/developer/agents/{id}/notice`
+     with the sender's phone); the notice starts an agent turn, the agent calls
+     `status` and sends the result. The notice text is paraphrased by the agent, so
+     keep the facts in the tool result, not in the notice.
    - The story safety rules in LESSONS apply to texted links too: refuse stories
      about death, violence, crime, private people, with a kind one-line reply.
-3. **Sending pictures**: use Keiki's file sending for the four panels (one message
-   each, in order, or one message if it supports several). If the shared number
-   cannot send files, send the app link and the four captions as text, and say so
-   in `NOTES.md`.
+3. **Sending pictures**: `send_file` delivers a file from the agent's sandbox, so
+   the agent first downloads the four picture URLs into its sandbox, then sends
+   them in order with their captions. If that does not work on the shared number,
+   send the four captions as text plus the app link, and say so in `NOTES.md`.
 4. **App**: a small "Text Newsie" row in Today's footer that opens Messages to the
-   agent with the join text prefilled. Keep the edit to the Today screen small.
+   agent with the join text prefilled (the join code and link come from the agent's
+   shared line; read them with `get_agents_shared_line`). Keep the edit to the Today screen small.
 5. Later hook, not now: where a commission should cost $1, the reply would carry a
    Whop checkout link first. Leave a clearly named function for it and do not build it.
 
