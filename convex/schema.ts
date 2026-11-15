@@ -301,6 +301,44 @@ export default defineSchema({
     count: v.number(),
   }).index("by_device_date_kind", ["deviceId", "date", "kind"]),
 
+  quizzes: defineTable({
+    comicId: v.id("comics"),
+    question: v.string(),
+    options: v.array(v.string()),
+    answer: v.number(),
+    createdAt: v.number(),
+  }).index("by_comic", ["comicId"]),
+
+  quizAnswers: defineTable({
+    comicId: v.id("comics"),
+    deviceId: v.string(),
+    date: v.string(),
+    choice: v.number(),
+    right: v.boolean(),
+    points: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_comic_device", ["comicId", "deviceId"])
+    .index("by_device_date", ["deviceId", "date"]),
+
+  players: defineTable({
+    deviceId: v.string(),
+    name: v.string(),
+    updatedAt: v.number(),
+  }).index("by_device", ["deviceId"]),
+
+  playerDays: defineTable({
+    deviceId: v.string(),
+    date: v.string(),
+    points: v.number(),
+    negPoints: v.number(),
+    rightAnswers: v.number(),
+    streak: v.number(),
+    reachedAt: v.number(),
+  })
+    .index("by_device_date", ["deviceId", "date"])
+    .index("by_date_rank", ["date", "negPoints", "reachedAt"]),
+
   runs: defineTable({
     kind: v.string(),
     date: v.optional(v.string()),

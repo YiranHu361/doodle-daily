@@ -296,3 +296,18 @@
   needs a fresh development build.
 - **Codegen.** `convex/_generated/api.d.ts` was edited by hand to add `storyPage`, because `npx convex codegen` pushes to
   the shared deployment.
+
+## Thread 12 (quick question and leaderboard)
+
+- **Tables.** `quizzes` (one per comic), `quizAnswers` (one per device per comic), `players` (a chosen name; without a row the
+  device shows `generatedName(deviceId)`, a stable "Adjective Animal"), `playerDays` (points, right answers and streak per
+  device per Pacific date). The board index is `(date, negPoints, reachedAt)`, so top 20 is one ordered read with ties
+  going to whoever reached the score first; your own rank outside the top 20 reads only the rows ahead of you (up to 1000,
+  then `rank: null`).
+- **Model.** `quiz:ensure` calls `claude-haiku-5-5` through `callClaude` (which now takes an optional `model`), 15 s timeout,
+  one retry, behind a `locks` row `quiz:<comicId>` (60 s). The options are shuffled on the server before saving. No key,
+  or a mock script provider (`SCRIPT_PROVIDER=mock`, test overrides), answers `unavailable`. `pipeline:panelDrawn` schedules `quiz:ensure` when a comic becomes ready; the Reader also calls it
+  once if the question is missing.
+- **Streak** is days in a row with at least one right answer; a day with only wrong answers carries yesterday's streak.
+- **Challenge link** uses thread 11's `storyLink` from `src/share/link.ts`.
+- **Not deployed.** `convex/_generated/api.d.ts` was edited by hand because `npx convex codegen` pushes to the shared deployment.

@@ -21,6 +21,7 @@ import { cut } from "./lib/text";
 import { ingestAll, type IngestReport } from "./ingest";
 import { getImageProvider, getScriptProvider, panelPrompt, type ScriptProvider } from "./providers";
 import { comicKind, section, sponsorKind } from "./schema";
+import { scheduleQuiz } from "./quiz";
 
 export const COMIC_DEADLINE_MS = 10 * 60 * 1000;
 export const HARD_STOP_MS = 20 * 60 * 1000;
@@ -768,6 +769,7 @@ export const panelDrawn = internalMutation({
     const ready = panels.every((p) => p.imageId);
     await ctx.db.patch(comicId, { panels, status: ready ? "ready" : "drawing" });
     if (ready) {
+      await scheduleQuiz(ctx, comicId);
       if (comic.lockToken) await release(ctx, "fresh", comic.lockToken);
       await settle(ctx, comic.editionId);
     }

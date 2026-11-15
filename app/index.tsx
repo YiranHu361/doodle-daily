@@ -25,6 +25,7 @@ import { DRAWING_SLOT, filterComics, orderForToday, stillDrawing, withDrawingLea
 import { useDrawFresh, useToday } from "../src/data/hooks";
 import { newsieSmsUrl } from "../src/data/newsie";
 import type { Comic, Edition } from "../src/data/types";
+import { TrophyButton } from "../src/quiz/TrophyButton";
 import { Robo } from "../src/robo/Robo";
 import { isRead, useCombo } from "../src/streak";
 import { ComboPill, ComboSheet } from "../src/streak/ui";
@@ -68,7 +69,10 @@ function Masthead({ edition, onCombo, onPlus, launch }: { edition: Edition | nul
         </Animated.View>
       </View>
       <View style={styles.mastRight}>
-        <ComboPill onPress={onCombo} />
+        <View style={styles.pills}>
+          <ComboPill onPress={onCombo} />
+          <TrophyButton />
+        </View>
         <Animated.View style={launch.robo}>
           <Robo pose="idle" size={84} />
         </Animated.View>
@@ -220,6 +224,7 @@ const styles = StyleSheet.create({
   masthead: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: space.margin, paddingTop: 8 },
   mastLeft: { gap: 6, flexShrink: 1 },
   mastRight: { alignItems: "center", gap: 8 },
+  pills: { flexDirection: "row", gap: 6 },
   tags: { flexDirection: "row", gap: 8 },
   date: { ...type.meta, color: colors.text.low },
   issueTag: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4 },
