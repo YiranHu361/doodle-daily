@@ -22,6 +22,7 @@ const PUBLIC_ALLOW_LIST = [
   "promote:transcribe",
   "reactions:counts",
   "reactions:toggle",
+  "storyPage:comic",
   "voice:ensure",
   "voice:forComic",
 ];

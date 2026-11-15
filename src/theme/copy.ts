@@ -20,4 +20,8 @@ export const copy = {
   reactionFailed: "That reaction didn't stick. Try again.",
   shareFailed: "Couldn't make the share picture. Try again.",
   browserFailed: "Couldn't open the source. Try again.",
+  share: "Share",
+  copyLink: "Copy link",
+  linkCopied: "Link copied",
+  copyFailed: "Couldn't copy the link. Try again.",
 } as const;

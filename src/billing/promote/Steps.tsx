@@ -330,7 +330,7 @@ export function DoneStep({ state, onDone }: { state: PromoState; onDone: () => v
   const today = useToday();
   const comic = today.kind === "ready" ? today.data.comics.find((c) => c._id === state.comicId) : undefined;
   const onShareError = useCallback(() => toast.show(copy.shareFailed), [toast]);
-  const share = useShare(onShareError);
+  const share = useShare(comic, onShareError);
   if (!state.section) return null;
   return (
     <View style={styles.statusBox}>

@@ -3,6 +3,7 @@ import { internal } from "./_generated/api";
 import { httpAction } from "./_generated/server";
 import { tool as keikiTool } from "./keiki";
 import { verifyWebhook } from "./lib/webhook";
+import { storyPage } from "./storyPage";
 
 const http = httpRouter();
 
@@ -44,6 +45,10 @@ http.route({
     return new Response(page, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } });
   }),
 });
+
+// ---------- Story links ----------
+
+http.route({ pathPrefix: "/s/", method: "GET", handler: storyPage });
 
 // ---------- Keiki ----------
 

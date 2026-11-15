@@ -1,18 +1,21 @@
-import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from "react";
-import type { View } from "react-native";
+import { Platform, Share, type View } from "react-native";
 import { captureRef } from "react-native-view-shot";
 import type { Comic } from "../data/types";
 import { notifyBusy } from "../streak";
+import { shareMessage, storyLink } from "./link";
 import { ShareCard } from "./ShareCard";
 
 type OnReady = (view: ComponentRef<typeof View>) => void;
 
-export function useShare(onError: () => void): { share: () => void; sharing: boolean; onReady: OnReady } {
+export function useShare(comic: Pick<Comic, "_id" | "title"> | undefined, onError: () => void): { share: () => void; sharing: boolean; onReady: OnReady } {
   const [sharing, setSharing] = useState(false);
   const errorRef = useRef(onError);
+  const message = comic ? shareMessage(comic.title, storyLink(comic._id)) : "";
+  const messageRef = useRef(message);
   useEffect(() => {
     errorRef.current = onError;
+    messageRef.current = message;
   });
 
   const onReady = useCallback<OnReady>((view) => {
@@ -20,7 +23,10 @@ export function useShare(onError: () => void): { share: () => void; sharing: boo
       try {
         const uri = await captureRef(view, { format: "jpg", quality: 0.92, result: "tmpfile", useRenderInContext: true });
         notifyBusy(true);
-        await Sharing.shareAsync(uri, { mimeType: "image/jpeg", UTI: "public.jpeg", dialogTitle: "Share this comic" });
+        await Share.share(
+          Platform.OS === "ios" ? { message: messageRef.current, url: uri } : { message: messageRef.current },
+          { dialogTitle: "Share this comic" },
+        );
       } catch {
         errorRef.current();
       } finally {

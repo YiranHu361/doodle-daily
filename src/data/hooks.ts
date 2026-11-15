@@ -5,7 +5,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { resolveScreen, type ScreenState } from "./connection";
 import { useConnection } from "./connectionHooks";
-import { decodeCounts, decodeDrawResult, decodeEdition, decodeSummaries } from "./decode";
+import { decodeComic, decodeCounts, decodeDrawResult, decodeEdition, decodeSummaries } from "./decode";
 import { useDeviceId } from "./deviceId";
 import { drawReducer, initialDrawState, isBusy, type DrawFailure, type DrawState } from "./drawFlow";
 import { fixtureStore } from "./fixtures";
@@ -77,6 +77,14 @@ export function useIssue(date: string | null): ScreenState<Edition> {
   const today = useToday(date === null);
   const byDate = useEditionByDate(date);
   return date === null ? today : byDate;
+}
+
+export function useComicById(comicId: string | null): Comic | null | undefined {
+  const { fixtures } = useFlags();
+  const deviceId = useDeviceId();
+  const raw = useQuery(api.storyPage.comic, comicId && deviceId && !fixtures ? { comicId, deviceId } : "skip");
+  if (!comicId || fixtures) return null;
+  return raw === undefined ? undefined : raw === null ? null : decodeComic(raw);
 }
 
 export function useEditionList(): ScreenState<EditionSummary[]> {

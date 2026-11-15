@@ -49,6 +49,7 @@ import type * as providers_types from "../providers/types.js";
 import type * as reactions from "../reactions.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
+import type * as storyPage from "../storyPage.js";
 import type * as voice from "../voice.js";
 
 import type {
@@ -99,6 +100,7 @@ declare const fullApi: ApiFromModules<{
   reactions: typeof reactions;
   seed: typeof seed;
   seedData: typeof seedData;
+  storyPage: typeof storyPage;
   voice: typeof voice;
 }>;
 
