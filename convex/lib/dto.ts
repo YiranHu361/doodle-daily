@@ -31,6 +31,7 @@ export const editionDTO = v.object({
   number: v.number(),
   status: editionStatus,
   comics: v.array(comicDTO),
+  locked: v.optional(v.boolean()),
 });
 
 export const editionSummaryDTO = v.object({
@@ -40,6 +41,7 @@ export const editionSummaryDTO = v.object({
   status: editionStatus,
   comicCount: v.number(),
   coverUrl: v.union(v.string(), v.null()),
+  locked: v.optional(v.boolean()),
 });
 
 export const reactionCountsDTO = v.object({
@@ -64,7 +66,7 @@ export async function visibleComics(ctx: QueryCtx, editionId: Doc<"editions">["_
     .query("comics")
     .withIndex("by_edition_order", (q) => q.eq("editionId", editionId))
     .take(MAX_EDITION_COMICS);
-  return comics.filter(isVisible);
+  return comics.filter((c) => isVisible(c) && c.kind !== "paper-sample");
 }
 
 export async function toComicDTO(ctx: QueryCtx, comic: Doc<"comics">): Promise<ComicDTO> {

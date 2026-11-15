@@ -7,7 +7,16 @@ export const section = v.union(
   v.literal("culture"),
   v.literal("memes"),
 );
-export const comicKind = v.union(v.literal("news"), v.literal("meme"), v.literal("commission"));
+export const comicKind = v.union(v.literal("news"), v.literal("meme"), v.literal("commission"), v.literal("paper-sample"));
+export const commissionStatus = v.union(
+  v.literal("awaiting_payment"),
+  v.literal("paid"),
+  v.literal("drawing"),
+  v.literal("ready"),
+  v.literal("failed"),
+  v.literal("refunded"),
+);
+export const entitlementKind = v.union(v.literal("plus"), v.literal("paper"));
 export const comicStatus = v.union(
   v.literal("scripted"),
   v.literal("drawing"),
@@ -145,6 +154,87 @@ export default defineSchema({
     name: v.string(),
     fetchedAt: v.number(),
   }).index("by_name", ["name"]),
+
+  entitlements: defineTable({
+    deviceId: v.string(),
+    kind: entitlementKind,
+    paperId: v.optional(v.id("papers")),
+    membershipId: v.string(),
+    status: v.string(),
+    periodEnd: v.optional(v.number()),
+    since: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_device_kind", ["deviceId", "kind"])
+    .index("by_membership", ["membershipId"])
+    .index("by_paper", ["paperId"]),
+
+  commissions: defineTable({
+    deviceId: v.string(),
+    topic: v.string(),
+    link: v.optional(v.string()),
+    headline: v.string(),
+    facts: v.array(v.string()),
+    status: commissionStatus,
+    checkoutId: v.optional(v.string()),
+    whopPaymentId: v.optional(v.string()),
+    comicId: v.optional(v.id("comics")),
+    refundId: v.optional(v.string()),
+    refundOwed: v.optional(v.boolean()),
+    error: v.optional(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_device_createdAt", ["deviceId", "createdAt"])
+    .index("by_payment", ["whopPaymentId"]),
+
+  webhookEvents: defineTable({
+    eventId: v.string(),
+    type: v.string(),
+    receivedAt: v.number(),
+    note: v.optional(v.string()),
+  }).index("by_eventId", ["eventId"]),
+
+  draws: defineTable({
+    deviceId: v.string(),
+    date: v.string(),
+    count: v.number(),
+  }).index("by_device_date", ["deviceId", "date"]),
+
+  freezes: defineTable({
+    deviceId: v.string(),
+    week: v.string(),
+    day: v.string(),
+    createdAt: v.number(),
+  }).index("by_device_week", ["deviceId", "week"]),
+
+  comboClaims: defineTable({
+    deviceId: v.string(),
+    membershipId: v.string(),
+    milestone: v.number(),
+    status: v.union(v.literal("pending"), v.literal("paid")),
+    periodEnd: v.optional(v.number()),
+    claimedAt: v.number(),
+  })
+    .index("by_membership_claimedAt", ["membershipId", "claimedAt"])
+    .index("by_membership_milestone", ["membershipId", "milestone"])
+    .index("by_device", ["deviceId"]),
+
+  papers: defineTable({
+    deviceId: v.string(),
+    name: v.string(),
+    niche: v.string(),
+    priceUsd: v.number(),
+    status: v.union(v.literal("creating"), v.literal("live")),
+    productId: v.optional(v.string()),
+    planId: v.optional(v.string()),
+    purchaseUrl: v.optional(v.string()),
+    sampleComicId: v.optional(v.id("comics")),
+    sampleError: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_device", ["deviceId"])
+    .index("by_createdAt", ["createdAt"]),
 
   runs: defineTable({
     kind: v.string(),

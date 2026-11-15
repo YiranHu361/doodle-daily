@@ -325,6 +325,9 @@ describe("pipeline:drawFreshOne", () => {
 
   test("draws the best unused story to the top of the newest issue, and a second press is busy until it lands", async () => {
     const t = convexTest(schema, modules);
+    await t.run(async (ctx) =>
+      ctx.db.insert("entitlements", { deviceId: DEVICE, kind: "plus", membershipId: "mem_test", status: "active", since: Date.now(), updatedAt: Date.now() }),
+    );
     await addItems(t);
     await t.action(internal.pipeline.buildEdition, { skipIngest: true });
     await settleAll(t, 20_000);

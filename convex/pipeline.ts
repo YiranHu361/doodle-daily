@@ -880,8 +880,11 @@ export const drawFreshOne = action({
     const expected = process.env.DEMO_SECRET ?? "";
     if (!expected || !constantTimeEqual(secret, expected)) return { ok: false, reason: "bad_secret" };
     if (!DEVICE_ID.test(deviceId)) throw new ConvexError("bad_device_id");
+    const tier = await ctx.runMutation(internal.billing.claimFreeDraw, { deviceId });
+    if (tier === "needs_plus") return { ok: false, reason: "needs_plus" };
     const holder = token();
     if (!(await ctx.runMutation(internal.pipeline.acquireLock, { name: "fresh", holder, ttlMs: FRESH_LOCK_MS }))) {
+      if (tier === "free") await ctx.runMutation(internal.billing.returnFreeDraw, { deviceId });
       return { ok: false, reason: "busy" };
     }
     let keepLock = false;
@@ -902,7 +905,10 @@ export const drawFreshOne = action({
       }
       return { ok: false, reason: "no_story" };
     } finally {
-      if (!keepLock) await ctx.runMutation(internal.pipeline.releaseLock, { name: "fresh", holder });
+      if (!keepLock) {
+        await ctx.runMutation(internal.pipeline.releaseLock, { name: "fresh", holder });
+        if (tier === "free") await ctx.runMutation(internal.billing.returnFreeDraw, { deviceId });
+      }
     }
   },
 });
@@ -914,7 +920,7 @@ const SECTION_WORDS: [Section, RegExp][] = [
   ["tech", /\b(ai|robot\w*|app|apps|software|phone|iphone|android|chip|chips|computer|startup|tech|code|coding|internet|website|gadget|laptop|cloud|model|gpu)\b/i],
 ];
 
-export function sectionForBrief(text: string, kind: "news" | "meme" | "commission"): Section {
+export function sectionForBrief(text: string, kind: typeof comicKind.type): Section {
   if (kind === "meme") return "memes";
   return SECTION_WORDS.find(([, re]) => re.test(text))?.[0] ?? "culture";
 }

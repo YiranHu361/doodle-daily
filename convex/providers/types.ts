@@ -4,7 +4,7 @@ export type Usage = { inputTokens: number; outputTokens: number };
 
 export type ScriptInput = {
   section: Section;
-  kind: "news" | "meme" | "commission";
+  kind: "news" | "meme" | "commission" | "paper-sample";
   headline: string;
   facts: string[];
   formats?: string[];

@@ -2,9 +2,18 @@
 import { expect, test } from "vitest";
 
 const PUBLIC_ALLOW_LIST = [
+  "billing:claimComboReward",
+  "billing:startPlusCheckout",
+  "billing:status",
+  "billing:useFreeze",
+  "commissions:mine",
+  "commissions:start",
   "editions:byDate",
   "editions:list",
   "editions:today",
+  "papers:create",
+  "papers:list",
+  "papers:startCheckout",
   "pipeline:drawFreshOne",
   "reactions:counts",
   "reactions:toggle",

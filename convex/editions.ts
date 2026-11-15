@@ -1,9 +1,16 @@
 import { v } from "convex/values";
-import { query } from "./_generated/server";
+import { query, type QueryCtx } from "./_generated/server";
+import { plusEntitlement } from "./billing";
+import { addDays, pacificDate } from "./lib/dates";
 import { editionDTO, editionSummaryDTO, toEditionDTO, visibleComics, type EditionDTO, type EditionSummaryDTO } from "./lib/dto";
 
 const TODAY_LOOKBACK = 7;
 const LIST_LIMIT = 30;
+
+async function oldestOpenDate(ctx: QueryCtx, deviceId: string | undefined): Promise<string> {
+  if (await plusEntitlement(ctx, deviceId)) return "";
+  return addDays(pacificDate(Date.now()), -1);
+}
 
 export const today = query({
   args: {},
@@ -19,9 +26,9 @@ export const today = query({
 });
 
 export const byDate = query({
-  args: { date: v.string() },
+  args: { date: v.string(), deviceId: v.optional(v.string()) },
   returns: v.union(editionDTO, v.null()),
-  handler: async (ctx, { date }): Promise<EditionDTO | null> => {
+  handler: async (ctx, { date, deviceId }): Promise<EditionDTO | null> => {
     const edition = await ctx.db
       .query("editions")
       .withIndex("by_date", (q) => q.eq("date", date))
@@ -29,14 +36,18 @@ export const byDate = query({
     if (!edition) return null;
     const comics = await visibleComics(ctx, edition._id);
     if (comics.length === 0) return null;
+    if (edition.date < (await oldestOpenDate(ctx, deviceId))) {
+      return { _id: edition._id, date: edition.date, number: edition.number, status: edition.status, comics: [], locked: true };
+    }
     return toEditionDTO(ctx, edition, comics);
   },
 });
 
 export const list = query({
-  args: {},
+  args: { deviceId: v.optional(v.string()) },
   returns: v.array(editionSummaryDTO),
-  handler: async (ctx): Promise<EditionSummaryDTO[]> => {
+  handler: async (ctx, { deviceId }): Promise<EditionSummaryDTO[]> => {
+    const openFrom = await oldestOpenDate(ctx, deviceId);
     const editions = await ctx.db.query("editions").withIndex("by_date").order("desc").take(LIST_LIMIT);
     const summaries: EditionSummaryDTO[] = [];
     for (const edition of editions) {
@@ -50,6 +61,7 @@ export const list = query({
         status: edition.status,
         comicCount: comics.length,
         coverUrl: coverId ? await ctx.storage.getUrl(coverId) : null,
+        ...(edition.date < openFrom ? { locked: true } : {}),
       });
     }
     return summaries;
