@@ -10,6 +10,7 @@ import {
   type MutationCtx,
 } from "./_generated/server";
 import { pacificDate } from "./lib/dates";
+import { isReplaceable } from "./lib/dto";
 import { isAggregatorUrl, publisherOf, type Section } from "./lib/feeds";
 import { isSafeStory } from "./lib/filter";
 import { describeFormat, formatKeyFor, formatsForPicker } from "./lib/formats";
@@ -215,6 +216,13 @@ export async function createEdition(ctx: MutationCtx, date: string): Promise<Doc
   const newest = await ctx.db.query("editions").withIndex("by_number").order("desc").first();
   const id = await ctx.db.insert("editions", { date, number: (newest?.number ?? 0) + 1, status: "building", createdAt: Date.now() });
   return (await ctx.db.get(id))!;
+}
+
+export async function replaceTop(ctx: MutationCtx, editionId: Id<"editions">, now: number): Promise<Doc<"comics"> | null> {
+  const comics = await editionComics(ctx, editionId);
+  const lead = comics.find(isReplaceable);
+  if (lead) await ctx.db.patch(lead._id, { replacedAt: now });
+  return lead ?? null;
 }
 
 async function editionComics(ctx: MutationCtx, editionId: Id<"editions">) {
@@ -520,7 +528,7 @@ export async function writeComic(
   ctx: ActionCtx,
   provider: ScriptProvider,
   storyId: Id<"stories">,
-  target: { editionId?: Id<"editions">; fresh?: boolean; pooled?: boolean; lockToken?: string },
+  target: { editionId?: Id<"editions">; fresh?: boolean; pooled?: boolean; lockToken?: string; replaceTop?: boolean },
 ): Promise<WriteOutcome & { detail?: string }> {
   const claimed = await ctx.runMutation(internal.pipeline.claimStory, { storyId });
   if (!claimed) return { ok: false, reason: "taken" };
@@ -539,12 +547,13 @@ export const startComic = internalMutation({
     fresh: v.optional(v.boolean()),
     pooled: v.optional(v.boolean()),
     lockToken: v.optional(v.string()),
+    replaceTop: v.optional(v.boolean()),
   },
   returns: v.union(
     v.object({ ok: v.literal(true), comicId: v.id("comics") }),
     v.object({ ok: v.literal(false), reason: v.union(v.literal("spend_cap"), v.literal("no_edition"), v.literal("taken"), v.literal("bad_script")) }),
   ),
-  handler: async (ctx, { storyId, script, editionId, fresh, pooled, lockToken }) => {
+  handler: async (ctx, { storyId, script, editionId, fresh, pooled, lockToken, replaceTop: replace }) => {
     const story = await ctx.db.get(storyId);
     if (!story) return { ok: false as const, reason: "taken" as const };
     const now = Date.now();
@@ -563,7 +572,8 @@ export const startComic = internalMutation({
       .withIndex("by_edition_order", (q) => q.eq("editionId", edition._id))
       .order(fresh ? "asc" : "desc")
       .first();
-    const order = existing ? existing.order + (fresh ? -1 : 1) : 0;
+    const replaced = replace ? await replaceTop(ctx, edition._id, now) : null;
+    const order = replaced ? replaced.order : existing ? existing.order + (fresh ? -1 : 1) : 0;
     const comicId = await ctx.db.insert("comics", {
       editionId: edition._id,
       storyId,
@@ -748,6 +758,8 @@ async function failComic(ctx: MutationCtx, comic: Doc<"comics">, reason: string)
   if (comic.status === "failed" || comic.status === "ready") return;
   await refund(ctx, pacificDate(comic.createdAt), comic.panels.filter((p) => !p.imageId).length);
   await ctx.db.patch(comic._id, { status: "failed", hidden: true, error: cut(reason, 300) });
+  const replaced = (await editionComics(ctx, comic.editionId)).find((c) => c.replacedAt === comic.createdAt && c._id !== comic._id);
+  if (replaced) await ctx.db.patch(replaced._id, { replacedAt: undefined });
   if (comic.lockToken) await release(ctx, "fresh", comic.lockToken);
   await settle(ctx, comic.editionId);
 }
@@ -922,7 +934,7 @@ const SLOW_NEWS_SCRIPT: Script = {
 type LiveOutcome = { ok: true; comicId: Id<"comics"> } | { ok: false; reason: "spend_cap" | "no_story" };
 
 export async function drawLive(ctx: ActionCtx, provider: ScriptProvider, date: string, lockToken: string): Promise<LiveOutcome> {
-  const target = { fresh: true, lockToken };
+  const target = { fresh: true, lockToken, replaceTop: true };
   const recent = async () => await ctx.runQuery(internal.pipeline.bestUnusedStory, { now: Date.now() });
   let ingested = false;
   for (let tries = 0; tries < 3; tries++) {

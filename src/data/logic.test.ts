@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { addDays, formatIssueDate, pacificDate } from "./clock";
 import { resolveScreen } from "./connection";
-import { APPEAR_LIMIT_MS, drawMessage, drawReducer, initialDrawState, isBusy, type DrawState } from "./drawFlow";
-import { filterComics, orderForToday } from "./filter";
+import { APPEAR_LIMIT_MS, drawingInLead, drawMessage, drawReducer, initialDrawState, isBusy, type DrawState } from "./drawFlow";
+import { DRAWING_SLOT, filterComics, orderForToday, withDrawingLead } from "./filter";
 import { flagsFromEnv, flagsFromUrl } from "./flagsParse";
 import { applyToggle, initialReactionState, reactionReducer, visibleCounts } from "./reactions";
 import { shouldMarkRead } from "./readTracker";
@@ -35,6 +35,20 @@ describe("chips", () => {
   test("the comic being drawn and new comics go to the top", () => {
     const list = [comic("a", "tech"), comic("n", "tech", { isNew: true, createdAt: 5 }), comic("f", "tech", { createdAt: 9 })];
     expect(orderForToday(list, "f").map((c) => c._id)).toEqual(["f", "n", "a"]);
+  });
+  test("while drawing, the drawing card takes the lead slot and adds no extra card", () => {
+    const list = [comic("a", "tech"), comic("b", "money"), comic("c", "culture")];
+    const ids = (slots: ReturnType<typeof withDrawingLead>) => slots.map((s) => (s === DRAWING_SLOT ? s : s._id));
+    expect(ids(withDrawingLead(list, true))).toEqual([DRAWING_SLOT, "b", "c"]);
+    expect(withDrawingLead(list, true)).toHaveLength(list.length);
+    expect(ids(withDrawingLead(list, false))).toEqual(["a", "b", "c"]);
+    expect(ids(withDrawingLead([], true))).toEqual([DRAWING_SLOT]);
+  });
+  test("the lead shows the drawing state from the press until the new comic is seen", () => {
+    const requesting = drawReducer(initialDrawState, { type: "start", now: 0 });
+    const drawing = drawReducer(requesting, { type: "result", result: { ok: true, comicId: "n" }, now: 1 });
+    const seen = drawReducer(drawing, { type: "snapshot", comics: [{ _id: "n", status: "drawing" }], now: 2 });
+    expect([initialDrawState, requesting, drawing, seen].map(drawingInLead)).toEqual([false, true, true, false]);
   });
 });
 

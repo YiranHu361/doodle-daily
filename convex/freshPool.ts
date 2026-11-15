@@ -3,7 +3,7 @@ import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { pacificDate } from "./lib/dates";
-import { createEdition, fallbackPick, newestEdition, release, settle, WIDE_STORY_WINDOW_MS, writeComic } from "./pipeline";
+import { createEdition, fallbackPick, newestEdition, release, replaceTop, settle, WIDE_STORY_WINDOW_MS, writeComic } from "./pipeline";
 import { getScriptProvider } from "./providers";
 
 export const REVEAL_DELAY_MS = 7000;
@@ -60,14 +60,17 @@ export const reveal = internalMutation({
     if (!comic || comic.pooled !== true) return null;
     const now = Date.now();
     const edition = (await newestEdition(ctx)) ?? (await createEdition(ctx, pacificDate(now)));
-    const top = await ctx.db
-      .query("comics")
-      .withIndex("by_edition_order", (q) => q.eq("editionId", edition._id))
-      .order("asc")
-      .first();
+    const replaced = await replaceTop(ctx, edition._id, now);
+    const top = replaced
+      ? null
+      : await ctx.db
+          .query("comics")
+          .withIndex("by_edition_order", (q) => q.eq("editionId", edition._id))
+          .order("asc")
+          .first();
     await ctx.db.patch(comicId, {
       editionId: edition._id,
-      order: top ? top.order - 1 : 0,
+      order: replaced ? replaced.order : top ? top.order - 1 : 0,
       createdAt: now,
       fresh: true,
       pooled: undefined,

@@ -336,6 +336,7 @@ describe("pipeline:drawFreshOne", () => {
     await addItems(t);
     await t.action(internal.pipeline.buildEdition, { skipIngest: true });
     await settleAll(t, 20_000);
+    const built = (await t.query(api.editions.today, {}))!.comics.length;
     const first = await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: SECRET });
     expect(first.ok).toBe(true);
     expect(await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: SECRET })).toEqual({ ok: false, reason: "busy" });
@@ -347,7 +348,7 @@ describe("pipeline:drawFreshOne", () => {
     const after = (await t.query(api.editions.today, {}))!;
     expect(after.status).toBe("published");
     expect(after.comics[0]).toMatchObject({ isNew: true, status: "ready" });
-    expect(after.comics).toHaveLength(10);
+    expect(after.comics).toHaveLength(built);
     const second = await t.action(api.pipeline.drawFreshOne, { deviceId: DEVICE, secret: SECRET });
     expect(second.ok).toBe(true);
   });

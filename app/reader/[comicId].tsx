@@ -311,7 +311,10 @@ function ReaderView({ comic }: { comic: Comic }) {
 export default function Reader() {
   const params = useLocalSearchParams<{ comicId: string; date?: string }>();
   const issue = useIssue(params.date ?? null);
-  const comic = issue.kind === "ready" ? issue.data.comics.find((c) => c._id === params.comicId) : undefined;
+  const found = issue.kind === "ready" ? issue.data.comics.find((c) => c._id === params.comicId) : undefined;
+  const [kept, setKept] = useState(found);
+  if (found && found !== kept) setKept(found);
+  const comic = found ?? kept;
   if (comic) return <ReaderView key={comic._id} comic={comic} />;
   return (
     <View style={styles.flex}>
