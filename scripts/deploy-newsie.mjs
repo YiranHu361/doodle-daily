@@ -30,11 +30,10 @@ const body = {
     },
     {
       name: "get_comic_status",
-      description: "Look up a comic started with make_comic. Answers drawing, failed with a reason to send, or ready with the title, four pictures (imageUrl and caption, in order), realStory, sourceUrl and appLink.",
+      description: "Look up a comic started with make_comic (the person's latest one when no commission_id is given). Answers drawing, failed with a reason to send, or ready with the title, four pictures (imageUrl and caption, in order), realStory, sourceUrl and appLink.",
       inputSchema: {
         type: "object",
-        properties: { commission_id: { type: "string", description: "The commission_id from make_comic or from the notice." } },
-        required: ["commission_id"],
+        properties: { commission_id: { type: "string", description: "The commission_id from make_comic or from the notice. Leave it out to get the person's latest comic." } },
       },
       executionType: "webhook",
       webhookUrl: toolUrl("status"),

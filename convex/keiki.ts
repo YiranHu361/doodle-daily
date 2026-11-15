@@ -284,8 +284,16 @@ export const status = internalQuery({
   returns: statusOut,
   handler: async (ctx, { commissionId, sender }): Promise<StatusOut> => {
     const id = ctx.db.normalizeId("textCommissions", commissionId);
-    const row = id ? await ctx.db.get(id) : null;
-    if (!row || row.sender !== sender) return { status: "not_found", reason: "I can't find that comic. Send me the link again?" };
+    const byId = id ? await ctx.db.get(id) : null;
+    const row =
+      byId?.sender === sender
+        ? byId
+        : await ctx.db
+            .query("textCommissions")
+            .withIndex("by_sender_date", (q) => q.eq("sender", sender).eq("date", pacificDate(Date.now())))
+            .order("desc")
+            .first();
+    if (!row) return { status: "not_found", reason: "I can't find that comic. Send me the link again?" };
     if (row.status === "failed") return { status: "failed", reason: FRIENDLY[row.reason ?? "unfinished"] };
     const comic = row.comicId ? await ctx.db.get(row.comicId) : null;
     const ready = row.status === "ready" && comic ? await readyComic(ctx, comic) : null;
