@@ -33,6 +33,7 @@ import type * as lib_text from "../lib/text.js";
 import type * as lib_urls from "../lib/urls.js";
 import type * as lib_webhook from "../lib/webhook.js";
 import type * as lib_whop from "../lib/whop.js";
+import type * as papers from "../papers.js";
 import type * as pipeline from "../pipeline.js";
 import type * as providers_anthropic from "../providers/anthropic.js";
 import type * as providers_index from "../providers/index.js";
@@ -78,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   "lib/urls": typeof lib_urls;
   "lib/webhook": typeof lib_webhook;
   "lib/whop": typeof lib_whop;
+  papers: typeof papers;
   pipeline: typeof pipeline;
   "providers/anthropic": typeof providers_anthropic;
   "providers/index": typeof providers_index;

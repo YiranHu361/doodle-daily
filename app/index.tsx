@@ -13,7 +13,7 @@ import { SkeletonList } from "../src/components/Skeleton";
 import { EmptyState, ErrorBoundary, ErrorState } from "../src/components/States";
 import { useToast } from "../src/components/Toast";
 import { Banner, SecondaryButton } from "../src/components/ui";
-import { ComboFreeze, PaywallSheet, usePlus } from "../src/billing";
+import { ComboFreeze, PapersShelf, PaywallSheet, usePlus } from "../src/billing";
 import { now, formatIssueDate, pacificDate } from "../src/data/clock";
 import { restartColdStartWindow } from "../src/data/connectionHooks";
 import { drawMessage, type DrawFailure } from "../src/data/drawFlow";
@@ -76,6 +76,7 @@ function TodayScreen() {
   const [chip, setChip] = useState<Chip>("all");
   const [sheet, setSheet] = useState(false);
   const [paywall, setPaywall] = useState(false);
+  const [papers, setPapers] = useState(false);
   const [, setRetry] = useState(0);
   const edition = today.kind === "ready" ? today.data : null;
   const comics = useMemo(() => edition?.comics ?? [], [edition]);
@@ -135,6 +136,7 @@ function TodayScreen() {
         )}
         <View style={styles.footer}>
           <SecondaryButton testID="archiveButton" label={copy.backIssues} onPress={() => router.push("/archive")} style={styles.footerButton} />
+          <SecondaryButton testID="papersButton" label="Papers" onPress={() => setPapers(true)} style={styles.footerButton} />
           <Text style={styles.footerLine}>{copy.footer}</Text>
         </View>
       </View>
@@ -152,7 +154,15 @@ function TodayScreen() {
       </SafeAreaView>
       <Dock ref={dock} busy={draw.busy} onDraw={draw.start} />
       <ComboSheet visible={sheet} onClose={() => setSheet(false)} />
-      <PaywallSheet visible={paywall} onClose={() => setPaywall(false)} />
+      <PaywallSheet
+        visible={paywall}
+        onClose={() => setPaywall(false)}
+        onOwnPaper={() => {
+          setPaywall(false);
+          setTimeout(() => setPapers(true), 450);
+        }}
+      />
+      <PapersShelf visible={papers} onClose={() => setPapers(false)} />
       <ComboFreeze />
     </View>
   );

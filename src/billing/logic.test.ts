@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { commissionArgs, commissionLine, freezeDay, isMilestone, looksLikeLink, rewardLine } from "./logic";
+import { commissionArgs, commissionLine, freezeDay, isMilestone, looksLikeLink, parsePrice, rewardLine } from "./logic";
 
 describe("billing logic", () => {
   test("a pasted link is sent as a link, anything else as a topic", () => {
@@ -17,6 +17,10 @@ describe("billing logic", () => {
     expect(freezeDay({ runEnd: "2026-11-13" }, "2026-11-15")).toBe("2026-11-14");
     expect(freezeDay({ runEnd: "2026-11-12" }, "2026-11-15")).toBeNull();
     expect(freezeDay(null, "2026-11-15")).toBeNull();
+  });
+
+  test("paper prices are 1 to 20 dollars", () => {
+    expect(["3", "$4.5", "0.5", "21", "abc"].map(parsePrice)).toEqual([3, 4.5, null, null, null]);
   });
 
   test("status lines tell the reader what happens", () => {

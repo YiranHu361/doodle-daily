@@ -46,6 +46,31 @@ export function startFailMessage(reason: StartFailure): string {
   }
 }
 
+export const PAPER_NAME_MAX = 30;
+export const PAPER_NICHE_MAX = 80;
+
+export type PaperFailure = "bad_input" | "not_allowed" | "limit" | "spend_cap" | "unavailable";
+
+export function parsePrice(text: string): number | null {
+  const n = Number(text.replace(/^\$/, "").trim());
+  return Number.isFinite(n) && n >= 1 && n <= 20 ? Math.round(n * 100) / 100 : null;
+}
+
+export function paperFailMessage(reason: PaperFailure): string {
+  switch (reason) {
+    case "bad_input":
+      return `Give it a name (up to ${PAPER_NAME_MAX} characters), a niche (up to ${PAPER_NICHE_MAX}) and a price from $1 to $20.`;
+    case "not_allowed":
+      return "Robo keeps papers friendly and won't draw that niche. Try another.";
+    case "limit":
+      return "You already run two papers. That's plenty of crayons.";
+    case "spend_cap":
+      return "Robo is out of crayons for today. Try again tomorrow.";
+    case "unavailable":
+      return "Whop isn't answering right now. Try again in a minute.";
+  }
+}
+
 export function isMilestone(comboDays: number): boolean {
   return Number.isInteger(comboDays) && comboDays >= COMBO_STEP && comboDays % COMBO_STEP === 0;
 }
