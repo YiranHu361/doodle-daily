@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 import { useEffect, useRef, useState } from "react";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   cancelAnimation,
   Easing,
@@ -72,6 +72,7 @@ function CelebrationView({ celebration, onDone }: { celebration: Celebration; on
 
   useEffect(() => {
     const at = (ms: number, fn: () => void) => timers.current.push(setTimeout(fn, ms));
+    AccessibilityInfo.announceForAccessibility(`${copy.dayCleared}. ${celebration.to} ${copy.dayCombo}. ${celebration.bubble}`);
     if (reduced) {
       all.forEach((v) => (v.value = withTiming(1, { duration: springs.fadeMs })));
       at(springs.fadeMs, () => setRest(true));
@@ -91,8 +92,16 @@ function CelebrationView({ celebration, onDone }: { celebration: Celebration; on
     at(T.title + 140, () => void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined));
     const steps = Math.max(1, celebration.to - celebration.from);
     const stepMs = Math.min(150, 450 / steps);
-    for (let i = 1; i <= steps; i++) at(T.number + i * stepMs, () => setCount(Math.min(celebration.to, celebration.from + i)));
-    at(T.week, () => setTodayLit(true));
+    for (let i = 1; i <= steps; i++)
+      at(T.number + i * stepMs, () => {
+        setCount(Math.min(celebration.to, celebration.from + i));
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+      });
+    at(T.confetti, () => void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined));
+    at(T.week, () => {
+      setTodayLit(true);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Rigid).catch(() => undefined);
+    });
     at(T.rest, () => setRest(true));
     return () => timers.current.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
