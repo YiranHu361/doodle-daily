@@ -111,8 +111,8 @@ function CelebrationView({ celebration, onDone }: { celebration: Celebration; on
   return (
     <Pressable
       testID="celebrationOverlay"
+      accessible={false}
       accessibilityViewIsModal
-      accessibilityLabel={`${copy.dayCleared}. ${celebration.to} ${copy.dayCombo}.`}
       onPress={rest ? undefined : finish}
       style={StyleSheet.absoluteFill}
     >
@@ -124,7 +124,7 @@ function CelebrationView({ celebration, onDone }: { celebration: Celebration; on
         <Animated.Text style={[styles.title, titleStyle]} accessibilityRole="header">
           {copy.dayCleared}
         </Animated.Text>
-        <Animated.View style={[styles.numberRow, numberStyle]}>
+        <Animated.View style={[styles.numberRow, numberStyle]} accessible accessibilityLabel={`${celebration.to} ${copy.dayCombo}`}>
           <Bolt size={56} />
           <Text testID="celebrationCount" style={styles.number}>{count}</Text>
         </Animated.View>
@@ -192,7 +192,7 @@ function Piece({ burst, color, dx, dy, spin, w, h }: { burst: SharedValue<number
 }
 
 const styles = StyleSheet.create({
-  dim: { backgroundColor: "rgba(7,5,26,0.9)" },
+  dim: { backgroundColor: "rgba(7,5,26,0.95)" },
   column: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24, gap: 10 },
   title: { ...type.displayLg, fontSize: 40, color: colors.neon.volt, textAlign: "center", textShadowColor: colors.neon.volt, textShadowRadius: 12 },
   numberRow: { flexDirection: "row", alignItems: "center", gap: 6 },
