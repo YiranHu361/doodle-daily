@@ -1,0 +1,29 @@
+# Revyl build and pull-request proof config. Not yet validated with `revyl config validate`:
+# the Revyl GitHub App must be installed on this repository and the project
+# registered (`revyl init` / `revyl github setup`) before proof of changes runs.
+build:
+  framework: expo
+  env:
+    EXPO_PUBLIC_CONVEX_URL: https://resilient-ostrich-674.convex.cloud
+  profiles:
+    pull-request:
+      ios:
+        app_id: "7bbc120f-b154-4fde-8260-ed23783d05f3"
+        setup_commands:
+          - npm ci --no-audit --no-fund
+          - CI=1 npx expo prebuild --platform ios --clean
+        build_commands:
+          - xcodebuild -workspace ios/DoodleDaily.xcworkspace -scheme DoodleDaily -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build
+        output_path: ios/build/Build/Products/Release-iphonesimulator/*.app
+
+pr_review:
+  enabled: true
+  build:
+    kind: revyl
+    profile: pull-request
+  proof_of_changes:
+    enabled: true
+    harness:
+      kind: revyl
+    always_verify:
+      - "The app launches to the Today screen and shows at least 6 comic titles with pictures"
