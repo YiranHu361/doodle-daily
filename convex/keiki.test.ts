@@ -130,6 +130,7 @@ describe("keiki tool endpoint", () => {
     expect(notices[0].body).toMatchObject({ phone: PHONE, text: expect.stringContaining(id) });
 
     expect((await callTool(t, "status", { commission_id: id }, { phone: "+15555550199" })).body).toMatchObject({ status: "not_found" });
+    expect((await callTool(t, "status", {})).body).toMatchObject({ status: "ready", sourceUrl: "https://news.example.com/coffee" });
   });
 
   test("a failed draw ends as failed with a friendly reason and still notifies", async () => {

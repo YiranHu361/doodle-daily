@@ -240,3 +240,14 @@
   there and the tool answers `payment_needed` with it.
 - **Agent spec** is `scripts/deploy-newsie.mjs` plus `scripts/newsie-prompt.md`; it deploys with an `api`
   channel (the API gateway is the test channel) and `features.sandbox` for `send_file`.
+- **Live round trip (2026-11-15, API gateway).** Tool calls work in the unlocked org. A texted Ars Technica link
+  got "On it. Sharpening crayons." in 6.6 s; the comic was ready 26.5 s later; asking "is my comic ready?" returned
+  the comic in 16.8 s. About 40k Keiki tokens per round trip, plus about $0.27 of our own spend per comic (4
+  panels at about $0.06, script about $0.03).
+- **Notices do not run on API-gateway conversations.** `/notice` with an `api:<agent>:<conversation>` identity
+  answers `outcome: "unavailable"`, which `keiki:notify` now records as `noticeError`. Push delivery is for real
+  channels (iMessage); on the API the person asks again.
+- **The gateway keeps no tool results in history**, so Newsie lost the commission id between turns.
+  `get_comic_status` with no or an unknown id now answers the sender's latest comic of the day.
+- **Pictures.** On the API gateway Newsie fell back to the four captions as text, with no `files`. `send_file`
+  on the shared iMessage number has not been tried yet.
