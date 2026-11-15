@@ -81,3 +81,34 @@
 | `admin:wipeDay '{"date":"..."}'` | delete a day's issue and release its stories |
 | `admin:spendToday` | images reserved and used, script calls, tokens, estimated USD |
 
+## Thread 3 (app screens)
+
+- **Launch flags.** Build-time env `EXPO_PUBLIC_FIXTURES`, `EXPO_PUBLIC_SKIP_INTRO`,
+  `EXPO_PUBLIC_RESET`, `EXPO_PUBLIC_NOW` (ISO or ms), or a deep link such as
+  `doodledaily://launch?fixtures=1&skipIntro=1&reset=1&now=2026-11-15T17:00:00Z`.
+  Reset clears AsyncStorage and the device id. The fixed "now" drives the app's own
+  clock (dates, older-issue banner); the streak store keeps its own injected clock.
+- **Fixtures** live in `src/data/fixtures/`: an 8-comic issue (two per section), a
+  6-comic yesterday, one locked back issue, local 192 px pictures, in-memory
+  reactions, and a simulated "Draw a fresh one" that fills in panel by panel.
+- **`pipeline:drawFreshOne`** is called by name (`makeFunctionReference`) because thread 2
+  has not deployed it yet; until it exists every press ends in "My crayon snapped.
+  Try again." The demo secret comes from `EXPO_PUBLIC_DEMO_SECRET`.
+- **`editions:list` / `editions:byDate`** are called without `deviceId` (the deployed
+  validators reject extra args). Thread 5 should add it in `src/data/hooks.ts` when the
+  server accepts it; the app already decodes and honours `locked`.
+- **CelebrationHost** stays mounted once in the root layout rather than inside the
+  Reader: the Reader is a pushed (non-modal) stack screen, so the root overlay draws
+  above it and keeps playing after the Reader closes. The Reader calls
+  `notifyReaderClosed()` and `notifyBusy()` through `src/components/celebrationBridge.ts`,
+  which only calls them if `src/streak/ui` exports them (thread 4 adds them).
+- **testIDs** with an index are 0-based: `comicCard_0`, `panel_0`..`panel_3`,
+  `archiveRow_0`. Extra ids: `wordmark`, `todayList`, `realStoryThumb_{i}`,
+  `offlineBanner`, `olderIssueBanner`, `buildingBanner`, `emptySection`,
+  `archiveEmpty`, `errorState`, `retryButton`, `backButton`, `toast`.
+- **Tests** are vitest over pure modules (decode, chips, draw flow, reactions,
+  read rule, connection state, flags, share layout). No React Native Testing Library:
+  vitest here runs in the edge runtime and rendering RN components needs a jest-expo
+  setup, which would change `package.json` that other threads share.
+- **Image memory cap.** expo-image has no API to cap its memory cache; pictures use
+  `cachePolicy="memory-disk"` with downscaling, so each is fetched once.

@@ -1,79 +1,192 @@
-import { useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, View } from "react-native";
+import * as Haptics from "expo-haptics";
+import { router } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ComicCard } from "../src/components/ComicCard";
-import { useToday } from "../src/data/useToday";
+import Svg, { Path } from "react-native-svg";
+import { ChipRow } from "../src/components/ChipRow";
+import { ComicCard, DrawingCard } from "../src/components/ComicCard";
+import { Dock, DOCK_HEIGHT, type DockHandle } from "../src/components/Dock";
+import { GridBackground } from "../src/components/GridBackground";
+import { CutBox } from "../src/components/shapes";
+import { SkeletonList } from "../src/components/Skeleton";
+import { EmptyState, ErrorBoundary, ErrorState } from "../src/components/States";
+import { useToast } from "../src/components/Toast";
+import { Banner, SecondaryButton } from "../src/components/ui";
+import { PaywallSheet, usePlus } from "../src/billing";
+import { now, formatIssueDate, pacificDate } from "../src/data/clock";
+import { restartColdStartWindow } from "../src/data/connectionHooks";
+import { drawMessage, type DrawFailure } from "../src/data/drawFlow";
+import { filterComics, orderForToday, stillDrawing, type Chip } from "../src/data/filter";
+import { useDrawFresh, useToday } from "../src/data/hooks";
+import type { Comic, Edition } from "../src/data/types";
 import { Robo } from "../src/robo/Robo";
+import { isRead, useCombo } from "../src/streak";
 import { ComboPill, ComboSheet } from "../src/streak/ui";
-import { colors, space, type } from "../src/theme";
+import { colors, cut, space, type } from "../src/theme";
+import { copy } from "../src/theme/copy";
 
-function formatDate(date: string): string {
-  const [y, m, d] = date.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-export default function Today() {
-  const today = useToday();
-  const [sheet, setSheet] = useState(false);
-  const edition = today.edition;
-
-  const header = (
+function Masthead({ edition, onCombo }: { edition: Edition | null; onCombo: () => void }) {
+  const { plus } = usePlus();
+  return (
     <View style={styles.masthead}>
       <View style={styles.mastLeft}>
-        {edition ? <Text style={styles.date}>{formatDate(edition.date)}</Text> : null}
-        {edition ? <Text style={styles.issue}>ISSUE {edition.number}</Text> : null}
-        <Text style={styles.doodle}>DOODLE</Text>
-        <Text style={styles.daily}>DAILY</Text>
+        <Text style={styles.date}>{edition ? formatIssueDate(edition.date) : " "}</Text>
+        <View style={styles.tags}>
+          {edition ? (
+            <CutBox cut={cut.chip} fill={colors.surface[2]} style={styles.issueTag}>
+              <Text style={styles.issue} maxFontSizeMultiplier={1.3}>
+                {copy.issueTag(edition.number)}
+              </Text>
+            </CutBox>
+          ) : null}
+          {plus ? (
+            <CutBox cut={cut.chip} stroke={colors.neon.volt} strokeWidth={1} style={styles.issueTag}>
+              <Text style={styles.issue}>PLUS</Text>
+            </CutBox>
+          ) : null}
+        </View>
+        <View accessible accessibilityRole="header" accessibilityLabel="Doodle Daily" testID="wordmark">
+          <Text style={styles.doodle} maxFontSizeMultiplier={1.2}>
+            DOODLE
+          </Text>
+          <Svg width={176} height={10} viewBox="0 0 176 10" style={styles.swoosh}>
+            <Path d="M2 7 Q 50 1 100 5 T 174 3" stroke={colors.neon.volt} strokeWidth={4} strokeLinecap="round" fill="none" />
+          </Svg>
+          <Text style={styles.daily} maxFontSizeMultiplier={1.2}>
+            DAILY
+          </Text>
+        </View>
       </View>
       <View style={styles.mastRight}>
-        <ComboPill onPress={() => setSheet(true)} />
-        <Robo size={56} />
+        <ComboPill onPress={onCombo} />
+        <Robo pose="idle" size={84} />
       </View>
     </View>
   );
+}
+
+function TodayScreen() {
+  const today = useToday();
+  const toast = useToast();
+  const combo = useCombo();
+  const dock = useRef<DockHandle>(null);
+  const [chip, setChip] = useState<Chip>("all");
+  const [sheet, setSheet] = useState(false);
+  const [paywall, setPaywall] = useState(false);
+  const [, setRetry] = useState(0);
+  const edition = today.kind === "ready" ? today.data : null;
+  const comics = useMemo(() => edition?.comics ?? [], [edition]);
+
+  const onFailed = useCallback(
+    (reason: DrawFailure) => {
+      if (reason === "needs_plus") {
+        setPaywall(true);
+        return;
+      }
+      dock.current?.shake();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => undefined);
+      const message = drawMessage(reason);
+      if (message) toast.show(message);
+    },
+    [toast],
+  );
+  const onDone = useCallback(() => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+  }, []);
+  const draw = useDrawFresh(comics, { onFailed, onDone });
+
+  const freshId = draw.state.phase === "drawing" ? draw.state.comicId : null;
+  const showDrawingCard = draw.state.phase === "requesting" || (draw.state.phase === "drawing" && !draw.state.seen);
+  const visible = useMemo(() => filterComics(orderForToday(comics, freshId), chip), [comics, freshId, chip]);
+  const drawingCount = stillDrawing(comics);
+  const olderIssue = edition !== null && edition.date < pacificDate(now());
+
+  const open = (c: Comic) => router.push({ pathname: "/reader/[comicId]", params: { comicId: c._id } });
+  void combo;
+
+  let body: React.ReactNode;
+  if (today.kind === "loading") body = <SkeletonList />;
+  else if (today.kind === "error")
+    body = (
+      <ErrorState
+        onRetry={() => {
+          restartColdStartWindow();
+          setRetry((n) => n + 1);
+        }}
+      />
+    );
+  else if (today.kind === "empty") body = <EmptyState title={copy.emptySection} />;
+  else
+    body = (
+      <View style={styles.cards}>
+        {today.offline ? <Banner testID="offlineBanner" tone="offline" text={copy.offline} /> : null}
+        {olderIssue && edition ? <Banner testID="olderIssueBanner" tone="warn" text={copy.olderIssue(edition.number)} /> : null}
+        {drawingCount > 0 ? <Banner testID="buildingBanner" text={copy.building(drawingCount)} /> : null}
+        {showDrawingCard ? <DrawingCard /> : null}
+        {visible.length === 0 ? (
+          <EmptyState title={copy.emptySection} pose="idle" testID="emptySection" />
+        ) : (
+          visible.map((c, i) => (
+            <ComicCard key={c._id} comic={c} index={i} lead={i === 0} read={isRead(c._id)} fresh={c._id === freshId} onPress={() => open(c)} />
+          ))
+        )}
+        <View style={styles.footer}>
+          <SecondaryButton testID="archiveButton" label={copy.backIssues} onPress={() => router.push("/archive")} style={styles.footerButton} />
+          <Text style={styles.footerLine}>{copy.footer}</Text>
+        </View>
+      </View>
+    );
 
   return (
-    <SafeAreaView style={styles.screen} edges={["top"]}>
-      {today.state === "ready" ? (
-        <FlatList
-          testID="todayList"
-          data={today.edition.comics}
-          keyExtractor={(c) => c._id}
-          ListHeaderComponent={header}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={{ height: space.gap }} />}
-          renderItem={({ item, index }) => <ComicCard comic={item} index={index} />}
-          ListFooterComponent={<Text style={styles.footer}>That&apos;s the whole issue. Go outside.</Text>}
-        />
-      ) : (
-        <View style={styles.list}>
-          {header}
-          {today.state === "loading" ? (
-            <ActivityIndicator color={colors.neon.volt} accessibilityLabel="Loading" />
-          ) : (
-            <Text style={styles.footer}>Nothing here today</Text>
-          )}
-        </View>
-      )}
+    <View style={styles.screen}>
+      <GridBackground />
+      <SafeAreaView style={styles.flex} edges={["top"]}>
+        <ScrollView testID="todayList" stickyHeaderIndices={[1]} contentContainerStyle={{ paddingBottom: DOCK_HEIGHT + 56 }}>
+          <Masthead edition={edition} onCombo={() => setSheet(true)} />
+          <ChipRow value={chip} onChange={setChip} />
+          <View style={styles.content}>{body}</View>
+        </ScrollView>
+      </SafeAreaView>
+      <Dock ref={dock} busy={draw.busy} onDraw={draw.start} />
       <ComboSheet visible={sheet} onClose={() => setSheet(false)} />
-    </SafeAreaView>
+      <PaywallSheet visible={paywall} onClose={() => setPaywall(false)} />
+    </View>
+  );
+}
+
+export default function Today() {
+  return (
+    <ErrorBoundary>
+      <TodayScreen />
+    </ErrorBoundary>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg.night },
-  list: { padding: space.margin, paddingBottom: 120 },
-  masthead: { flexDirection: "row", justifyContent: "space-between", marginBottom: space.gap },
-  mastLeft: { gap: 4 },
-  mastRight: { alignItems: "flex-end", gap: 8 },
+  flex: { flex: 1 },
+  content: { paddingHorizontal: space.margin, paddingTop: 8 },
+  cards: { gap: space.gap },
+  masthead: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: space.margin, paddingTop: 8 },
+  mastLeft: { gap: 6, flexShrink: 1 },
+  mastRight: { alignItems: "center", gap: 8 },
+  tags: { flexDirection: "row", gap: 8 },
   date: { ...type.meta, color: colors.text.low },
-  issue: { ...type.displaySm, fontSize: 14, color: colors.neon.volt, backgroundColor: colors.surface[2], alignSelf: "flex-start", paddingHorizontal: 8, paddingVertical: 2 },
-  doodle: { ...type.displayMd, color: colors.paper, textDecorationLine: "underline", textDecorationColor: colors.neon.volt },
-  daily: { ...type.displayMd, color: colors.text.hi, textShadowColor: colors.neon.cyan, textShadowRadius: 8 },
-  footer: { ...type.body, color: colors.text.mid, textAlign: "center", marginTop: 32 },
+  issueTag: { alignSelf: "flex-start", paddingHorizontal: 10, paddingVertical: 4 },
+  issue: { fontFamily: type.displaySm.fontFamily, fontSize: 14, color: colors.neon.volt },
+  doodle: { fontFamily: type.displayMd.fontFamily, fontSize: 42, lineHeight: 46, color: colors.paper },
+  swoosh: { marginTop: -4, marginBottom: 2 },
+  daily: {
+    fontFamily: type.displayMd.fontFamily,
+    fontSize: 42,
+    lineHeight: 46,
+    color: colors.wordmark.daily,
+    textShadowColor: colors.neon.cyan,
+    textShadowRadius: 10,
+    textShadowOffset: { width: 0, height: 0 },
+  },
+  footer: { alignItems: "center", gap: 16, paddingTop: 16 },
+  footerButton: { alignSelf: "stretch" },
+  footerLine: { ...type.body, color: colors.text.mid, textAlign: "center" },
 });
