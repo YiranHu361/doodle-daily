@@ -2,6 +2,7 @@ import { v, type Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import { section, comicKind, editionStatus, reactionKind, sponsorKind } from "../schema";
+import { isRealSource } from "./urls";
 
 export const panelDTO = v.object({
   scene: v.string(),
@@ -62,8 +63,12 @@ export type EditionSummaryDTO = Infer<typeof editionSummaryDTO>;
 
 export const MAX_EDITION_COMICS = 64;
 
+export function hasRealSource(comic: Pick<Doc<"comics">, "kind" | "sourceUrl">): boolean {
+  return (comic.kind !== "news" && comic.kind !== "meme") || isRealSource(comic.sourceUrl);
+}
+
 export function isVisible(comic: Doc<"comics">): boolean {
-  return comic.status !== "failed" && comic.hidden !== true && comic.pooled !== true && comic.panels.length === 4;
+  return comic.status !== "failed" && comic.hidden !== true && comic.pooled !== true && comic.panels.length === 4 && hasRealSource(comic);
 }
 
 export function isCreatedFor(comic: Doc<"comics">, viewer: string | undefined): boolean {

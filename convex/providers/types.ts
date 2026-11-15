@@ -8,6 +8,7 @@ export type ScriptInput = {
   headline: string;
   facts: string[];
   formats?: string[];
+  excerpt?: string;
   unverified?: boolean;
   repair?: { previous: unknown; errors: string[] };
 };

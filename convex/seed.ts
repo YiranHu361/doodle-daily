@@ -8,6 +8,11 @@ import { mockImageProvider, mockScriptProvider, panelPrompt, type Script } from 
 import { TODAY_STORIES, YESTERDAY_STORIES, type SeedStory } from "./seedData";
 
 const COMIC_DEADLINE_MS = 10 * 60 * 1000;
+export const SEED_REFUSED = "seed refused: set ALLOW_SEED=1 to run it, and never on a real deployment";
+
+export function seedAllowed(): boolean {
+  return process.env.ALLOW_SEED === "1";
+}
 
 const scriptPanel = v.object({ scene: v.string(), cast: v.array(v.string()), caption: v.string() });
 const seedComic = v.object({
@@ -54,6 +59,7 @@ export const writeEdition = internalMutation({
   args: { date: v.string(), replace: v.boolean(), comics: v.array(seedComic) },
   returns: v.union(writtenEdition, v.null()),
   handler: async (ctx, { date, replace, comics }) => {
+    if (!seedAllowed()) throw new Error(SEED_REFUSED);
     const existing = await ctx.db
       .query("editions")
       .withIndex("by_date", (q) => q.eq("date", date))
@@ -152,6 +158,7 @@ export const run = internalAction({
   },
   returns: v.object({ today: v.string(), written: v.array(v.string()) }),
   handler: async (ctx, args): Promise<{ today: string; written: string[] }> => {
+    if (!seedAllowed()) throw new Error(SEED_REFUSED);
     const startedAt = Date.now();
     const today = pacificDate(startedAt);
     const scripts = mockScriptProvider;

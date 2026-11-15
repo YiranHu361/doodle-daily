@@ -8,7 +8,7 @@ import { USER_AGENT_HEADERS } from "./lib/feeds";
 import { storyRefusal } from "./lib/filter";
 import { UNVERIFIED_SENTENCE } from "./lib/script";
 import { fetchText } from "./lib/http";
-import { cut, decodeEntities } from "./lib/text";
+import { cut, decodeEntities, stripHtml } from "./lib/text";
 import { createCheckout, planId, whop, whopConfig } from "./lib/whop";
 import { commissionStatus, promo } from "./schema";
 
@@ -73,6 +73,27 @@ export function pageMeta(html: string): PageMeta {
   const description = metaContent(head, ["og:description", "description", "twitter:description"]);
   const clean = (s: string) => decodeEntities(s).replace(/\s+/g, " ").trim();
   return { title: cut(clean(title), 200), description: cut(clean(description), 400) };
+}
+
+export const EXCERPT_MAX = 1500;
+const MIN_READABLE = 300;
+
+export function articleText(html: string): string {
+  const body = html
+    .slice(0, 2_000_000)
+    .replace(/<(script|style|noscript|svg|nav|header|footer|aside|form|figure)\b[\s\S]*?<\/\1>/gi, " ");
+  const scope = /<article\b[\s\S]*?<\/article>/i.exec(body)?.[0] ?? body;
+  const paragraphs = [...scope.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
+    .map((m) => stripHtml(m[1]))
+    .filter((p) => p.split(" ").length >= 8);
+  return paragraphs.join(" ").replace(/\s+/g, " ").trim();
+}
+
+export async function readArticle(link: string): Promise<string | null> {
+  const res = await fetchPage(link);
+  if (!res.ok) return null;
+  const text = articleText(res.text);
+  return text.length >= MIN_READABLE ? text.slice(0, EXCERPT_MAX) : null;
 }
 
 export function parseLink(raw: string): string | null {

@@ -1,7 +1,9 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { pacificDate } from "./lib/dates";
+import { isRealSource } from "./lib/urls";
 import { textOwner } from "./keiki";
 import { COMIC_DEADLINE_MS, deleteComic, imageCap, settle } from "./pipeline";
 
@@ -173,3 +175,107 @@ export const spendToday = internalQuery({
     };
   },
 });
+
+const FAKE_SOURCE_NAMES = new Set(["doodle daily sample desk", "doodle daily newsroom"]);
+
+function isUnsourced(row: { kind: string; sourceName: string; sourceUrl: string }): boolean {
+  if (row.kind !== "news" && row.kind !== "meme") return false;
+  return !isRealSource(row.sourceUrl) || FAKE_SOURCE_NAMES.has(row.sourceName.trim().toLowerCase());
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+export const purgeUnsourced = internalMutation({
+  args: {},
+  returns: v.object({
+    comics: v.array(v.object({ comicId: v.id("comics"), title: v.string(), sourceName: v.string(), sourceUrl: v.string(), wasPooled: v.boolean(), wasHidden: v.boolean() })),
+    storiesRetired: v.number(),
+    editionsSettled: v.number(),
+  }),
+  handler: async (ctx) => {
+    const comics: { comicId: Id<"comics">; title: string; sourceName: string; sourceUrl: string; wasPooled: boolean; wasHidden: boolean }[] = [];
+    const editions = new Set<Id<"editions">>();
+    const retired = new Set<Id<"stories">>();
+    for (const comic of await ctx.db.query("comics").collect()) {
+      if (!isUnsourced(comic)) continue;
+      const wasPooled = comic.pooled === true;
+      const wasHidden = comic.hidden === true;
+      if (!wasPooled && wasHidden && comic.revealAt === undefined) {
+        const story = comic.storyId ? await ctx.db.get(comic.storyId) : null;
+        if (!story || story.used) continue;
+      }
+      await ctx.db.patch(comic._id, { hidden: true, pooled: undefined, revealAt: undefined, fresh: undefined });
+      if (comic.storyId) {
+        const story = await ctx.db.get(comic.storyId);
+        if (story && !story.used) await ctx.db.patch(story._id, { used: true, claimedAt: Date.now() });
+        if (story) retired.add(story._id);
+      }
+      editions.add(comic.editionId);
+      comics.push({ comicId: comic._id, title: comic.title, sourceName: comic.sourceName, sourceUrl: comic.sourceUrl, wasPooled, wasHidden });
+    }
+    for (const story of await ctx.db.query("stories").withIndex("by_used_createdAt", (q) => q.eq("used", false)).collect()) {
+      if (!isUnsourced(story)) continue;
+      await ctx.db.patch(story._id, { used: true, claimedAt: Date.now() });
+      retired.add(story._id);
+    }
+    for (const editionId of editions) await settle(ctx, editionId);
+    return { comics, storiesRetired: retired.size, editionsSettled: editions.size };
+  },
+});
+
+export const sourceAudit = internalQuery({
+  args: { date: v.optional(v.string()) },
+  returns: v.object({
+    date: v.string(),
+    failures: v.number(),
+    rows: v.array(
+      v.object({
+        comicId: v.id("comics"),
+        where: v.union(v.literal("issue"), v.literal("pool")),
+        kind: v.string(),
+        title: v.string(),
+        sourceName: v.string(),
+        sourceHost: v.string(),
+        realSource: v.boolean(),
+        failure: v.boolean(),
+      }),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const date = args.date ?? pacificDate(Date.now());
+    const edition = await ctx.db
+      .query("editions")
+      .withIndex("by_date", (q) => q.eq("date", date))
+      .unique();
+    const inIssue = edition
+      ? (
+          await ctx.db
+            .query("comics")
+            .withIndex("by_edition_order", (q) => q.eq("editionId", edition._id))
+            .take(64)
+        ).filter((c) => c.pooled !== true && c.status !== "failed" && c.hidden !== true && c.replacedAt === undefined)
+      : [];
+    const pooled = await ctx.db
+      .query("comics")
+      .withIndex("by_pooled", (q) => q.eq("pooled", true))
+      .take(64);
+    const rows = [...inIssue.map((c) => ["issue", c] as const), ...pooled.map((c) => ["pool", c] as const)].map(([where, c]) => ({
+      comicId: c._id,
+      where,
+      kind: c.kind,
+      title: c.title,
+      sourceName: c.sourceName,
+      sourceHost: hostOf(c.sourceUrl),
+      realSource: isRealSource(c.sourceUrl),
+      failure: isUnsourced(c),
+    }));
+    return { date, failures: rows.filter((r) => r.failure).length, rows };
+  },
+});
+

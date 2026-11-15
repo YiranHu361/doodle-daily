@@ -50,6 +50,7 @@ import type * as quiz from "../quiz.js";
 import type * as reactions from "../reactions.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
+import type * as sourcing from "../sourcing.js";
 import type * as storyPage from "../storyPage.js";
 import type * as voice from "../voice.js";
 
@@ -102,6 +103,7 @@ declare const fullApi: ApiFromModules<{
   reactions: typeof reactions;
   seed: typeof seed;
   seedData: typeof seedData;
+  sourcing: typeof sourcing;
   storyPage: typeof storyPage;
   voice: typeof voice;
 }>;

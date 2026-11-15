@@ -30,6 +30,34 @@ export const FEEDS: FeedSource[] = [
   { section: "culture", source: "BBC Entertainment", url: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml" },
   { section: "culture", source: "Variety", url: "https://variety.com/feed/" },
   { section: "culture", source: "ESPN", url: "https://www.espn.com/espn/rss/news" },
+  { section: "tech", source: "BBC Technology", url: "https://feeds.bbci.co.uk/news/technology/rss.xml" },
+  { section: "tech", source: "Wired", url: "https://www.wired.com/feed/rss" },
+  { section: "tech", source: "Engadget", url: "https://www.engadget.com/rss.xml" },
+  { section: "tech", source: "NPR Technology", url: "https://feeds.npr.org/1019/rss.xml" },
+  { section: "tech", source: "Gizmodo", url: "https://gizmodo.com/rss" },
+  { section: "tech", source: "ZDNet", url: "https://www.zdnet.com/news/rss.xml" },
+  { section: "tech", source: "9to5Mac", url: "https://9to5mac.com/feed/" },
+  { section: "money", source: "Fortune", url: "https://fortune.com/feed/" },
+  { section: "money", source: "NPR Business", url: "https://feeds.npr.org/1006/rss.xml" },
+  { section: "money", source: "The Guardian Business", url: "https://www.theguardian.com/uk/business/rss" },
+  { section: "money", source: "CNBC Business", url: "https://www.cnbc.com/id/10001147/device/rss/rss.html" },
+  { section: "money", source: "Business Insider", url: "https://feeds.businessinsider.com/custom/all" },
+  { section: "money", source: "Fast Company", url: "https://www.fastcompany.com/latest/rss" },
+  { section: "culture", source: "Polygon", url: "https://www.polygon.com/rss/index.xml" },
+  { section: "culture", source: "Pitchfork", url: "https://pitchfork.com/feed/feed-news/rss" },
+  { section: "culture", source: "Rolling Stone", url: "https://www.rollingstone.com/feed/" },
+  { section: "culture", source: "NPR Arts", url: "https://feeds.npr.org/1008/rss.xml" },
+  { section: "culture", source: "The Guardian Culture", url: "https://www.theguardian.com/culture/rss" },
+  { section: "culture", source: "Billboard", url: "https://www.billboard.com/feed/" },
+  { section: "culture", source: "Kotaku", url: "https://kotaku.com/rss" },
+  { section: "culture", source: "Deadline", url: "https://deadline.com/feed/" },
+  { section: "culture", source: "The Hollywood Reporter", url: "https://www.hollywoodreporter.com/feed/" },
+  { section: "memes", source: "Know Your Meme", url: "https://knowyourmeme.com/newsfeed.rss" },
+  { section: "memes", source: "Know Your Meme Entries", url: "https://knowyourmeme.com/memes.rss" },
+  { section: "memes", source: "Daily Dot", url: "https://www.dailydot.com/feed/" },
+  { section: "memes", source: "Mashable", url: "https://mashable.com/feeds/rss/all" },
+  { section: "memes", source: "BBC Newsbeat", url: "https://feeds.bbci.co.uk/news/newsbeat/rss.xml" },
+  { section: "memes", source: "NPR Pop Culture", url: "https://feeds.npr.org/1048/rss.xml" },
 ];
 
 const AGGREGATORS = ["techmeme.com", "news.ycombinator.com", "news.google.com"];
@@ -88,7 +116,7 @@ function parseDate(raw: string): number | null {
   return Number.isFinite(ms) ? ms : null;
 }
 
-export function parseFeed(xml: string, feed: FeedSource, now: number): FeedItem[] {
+export function parseFeed(xml: string, feed: FeedSource, now: number, maxAgeMs = ITEM_MAX_AGE_MS): FeedItem[] {
   const isAtom = /<feed[\s>]/i.test(xml) && /<entry[\s>]/i.test(xml);
   const blocks = [...xml.matchAll(isAtom ? /<entry[\s>][\s\S]*?<\/entry>/gi : /<item[\s>][\s\S]*?<\/item>/gi)].map((m) => m[0]);
   const items: FeedItem[] = [];
@@ -103,7 +131,7 @@ export function parseFeed(xml: string, feed: FeedSource, now: number): FeedItem[
     const publishedAt = dateRaw ? parseDate(text(dateRaw)) : null;
     if (!title || !normaliseUrl(link)) continue;
     const at = publishedAt ?? now;
-    if (now - at > ITEM_MAX_AGE_MS || at - now > 60 * 60 * 1000) continue;
+    if (now - at > maxAgeMs || at - now > 60 * 60 * 1000) continue;
     items.push({
       section: feed.section,
       source: feed.source,

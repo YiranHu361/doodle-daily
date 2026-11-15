@@ -107,7 +107,8 @@ Launch flags for demos and tests (build-time env or a deep link):
 `fixtures=1` runs the app on bundled sample data with no network.
 
 **Backend.** With `CONVEX_DEPLOY_KEY` set, `npx convex dev --once` pushes functions.
-`npx convex run seed:run '{}'` writes a sample issue using mock providers (free);
+`npx convex run seed:run '{}'` writes a sample issue using mock providers (free) and
+refuses unless `ALLOW_SEED=1` is set on a throwaway deployment; never on a shared one;
 `npx convex run pipeline:buildEdition '{}'` builds today's issue with the real
 providers when their keys are set. See the admin table in `NOTES.md`.
 

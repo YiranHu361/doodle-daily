@@ -1,15 +1,15 @@
 import { convexTest } from "convex-test";
 import { expect, test } from "vitest";
-import { api, internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import schema from "./schema";
-import { modules } from "./test.setup";
+import { modules, seedForTests } from "./test.setup";
 
 const A = "device-aaaaaaaa";
 const B = "device-bbbbbbbb";
 
 async function setup() {
   const t = convexTest(schema, modules);
-  await t.action(internal.seed.run, { fast: true });
+  await seedForTests(t);
   const today = (await t.query(api.editions.today, {}))!;
   return { t, comicId: today.comics[0]._id, other: today.comics[1]._id };
 }

@@ -1,9 +1,9 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { api, internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import schema from "./schema";
-import { modules } from "./test.setup";
+import { modules, seedForTests } from "./test.setup";
 import { dailyVoiceCap, noteClips, SPEECH_URL, VOICE_MODEL, voiceRetryDelayMs } from "./voice";
 
 type Call = { model: string; voice: string; input: string; instructions: string; response_format: string };
@@ -38,7 +38,7 @@ afterEach(() => {
 
 async function setup() {
   const t = convexTest(schema, modules);
-  await t.action(internal.seed.run, { fast: true });
+  await seedForTests(t);
   const seeded = (await t.query(api.editions.today, {}))!;
   await t.run(async (ctx) => {
     for (const c of seeded.comics) {

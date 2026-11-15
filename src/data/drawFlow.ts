@@ -49,7 +49,7 @@ export function drawReducer(state: DrawState, event: DrawEvent): DrawState {
 }
 
 export const DRAW_MESSAGES: Record<Exclude<DrawFailure, "needs_plus">, string> = {
-  no_story: "No fresh stories right now.",
+  no_story: "Robo is still checking sources. Try again in a minute.",
   spend_cap: "Robo is out of crayons for today.",
   busy: "Robo is already drawing one.",
   bad_secret: "My crayon snapped. Try again.",

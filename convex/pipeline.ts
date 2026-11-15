@@ -9,6 +9,7 @@ import {
   type ActionCtx,
   type MutationCtx,
 } from "./_generated/server";
+import { readArticle } from "./commissions";
 import { pacificDate } from "./lib/dates";
 import { isReplaceable } from "./lib/dto";
 import { isAggregatorUrl, publisherOf, type Section } from "./lib/feeds";
@@ -18,10 +19,12 @@ import { sharesEvent } from "./lib/overlap";
 import { constantTimeEqual, MAX_PANEL_ATTEMPTS, retryDelayMs } from "./lib/retry";
 import { cleanScript, validateScript, type Script } from "./lib/script";
 import { cut } from "./lib/text";
+import { isRealSource } from "./lib/urls";
 import { ingestAll, type IngestReport } from "./ingest";
 import { getImageProvider, getScriptProvider, panelPrompt, type ScriptProvider } from "./providers";
 import { comicKind, section, sponsorKind } from "./schema";
 import { scheduleQuiz } from "./quiz";
+import { DEEP_SEARCH_MIN, deepSearch } from "./sourcing";
 
 export const COMIC_DEADLINE_MS = 10 * 60 * 1000;
 export const HARD_STOP_MS = 20 * 60 * 1000;
@@ -68,6 +71,7 @@ const storyInput = v.object({
   itemIds: v.array(v.id("items")),
   sourceName: v.string(),
   sourceUrl: v.string(),
+  originUrl: v.optional(v.string()),
   score: v.number(),
   whyFunny: v.optional(v.string()),
   format: v.optional(v.string()),
@@ -361,6 +365,7 @@ export const bestUnusedStory = internalQuery({
       .order("desc")
       .take(100);
     const best = fresh
+      .filter((s) => isRealSource(s.sourceUrl))
       .filter((s) => isSafeStory(`${s.headline} ${s.facts.join(" ")}`))
       .filter((s) => !inPaper.some((h) => sharesEvent(h, s.headline)))
       .sort((a, b) => b.score - a.score || b.createdAt - a.createdAt)[0];
@@ -416,6 +421,7 @@ async function pickNews(
   date: string,
 ): Promise<{ stories: StoryInput[]; note: string }> {
   const items = (await ctx.runQuery(internal.pipeline.candidates, { section: sectionName, since: Date.now() - CANDIDATE_WINDOW_MS }))
+    .filter((i) => isRealSource(i.url))
     .filter((i) => isSafeStory(`${i.title} ${i.summary}`))
     .filter((i) => !inPaper.some((h) => sharesEvent(h, i.title)))
     .slice(0, MAX_CANDIDATES);
@@ -452,7 +458,7 @@ async function pickMemes(
   date: string,
 ): Promise<{ stories: StoryInput[]; note: string }> {
   const items = (await ctx.runQuery(internal.pipeline.candidates, { section: "memes", since: Date.now() - CANDIDATE_WINDOW_MS })).filter(
-    (i) => i.source === "X" && isSafeStory(`${i.title} ${i.summary}`),
+    (i) => i.source === "X" && isRealSource(i.url) && isSafeStory(`${i.title} ${i.summary}`),
   );
   const trends = new Map<string, Candidate[]>();
   for (const it of items) trends.set(it.title, [...(trends.get(it.title) ?? []), it]);
@@ -490,6 +496,7 @@ async function pickMemes(
       itemIds: sources.map((s) => s._id),
       sourceName: "X",
       sourceUrl: sources[0].url,
+      originUrl: sources[0].url,
       score: Math.max(1, Math.min(10, Number(joke.score) || 5)),
       whyFunny: cut(joke.theJoke, 300),
       format: formatKeyFor(joke.format) ?? undefined,
@@ -504,12 +511,14 @@ type StoryDoc = Doc<"stories">;
 
 export async function writeValidScript(ctx: ActionCtx, provider: ScriptProvider, story: StoryDoc, date: string): Promise<Script | { error: string }> {
   const formatDescription = describeFormat(story.format);
+  const excerpt = needsSource(story.kind) && isRealSource(story.sourceUrl) ? await readArticle(story.sourceUrl).catch(() => null) : null;
   const base = {
     section: story.section,
     kind: story.kind,
     headline: story.kind === "meme" ? (story.whyFunny ?? story.headline) : story.headline,
     facts: story.facts,
     formats: formatDescription ? [formatDescription] : [],
+    ...(excerpt ? { excerpt } : {}),
     unverified: story.unverified === true,
   };
   let repair: { previous: unknown; errors: string[] } | undefined;
@@ -543,7 +552,11 @@ async function secondSlot(ctx: MutationCtx, editionId: Id<"editions">): Promise<
   return next ? (comics[leadAt].order + next.order) / 2 : comics[leadAt].order + 1;
 }
 
-type WriteOutcome = { ok: true; comicId: Id<"comics"> } | { ok: false; reason: "taken" | "bad_script" | "spend_cap" | "no_edition" };
+type WriteOutcome = { ok: true; comicId: Id<"comics"> } | { ok: false; reason: "taken" | "bad_script" | "spend_cap" | "no_edition" | "no_source" };
+
+export function needsSource(kind: Doc<"stories">["kind"]): boolean {
+  return kind === "news" || kind === "meme";
+}
 
 export async function writeComic(
   ctx: ActionCtx,
@@ -554,6 +567,7 @@ export async function writeComic(
   const claimed = await ctx.runMutation(internal.pipeline.claimStory, { storyId });
   if (!claimed) return { ok: false, reason: "taken" };
   const story = claimed.story as StoryDoc;
+  if (needsSource(story.kind) && !isRealSource(story.sourceUrl)) return { ok: false, reason: "no_source" };
   const date = pacificDate(Date.now());
   const script = await writeValidScript(ctx, provider, story, date);
   if ("error" in script) return { ok: false, reason: "bad_script", detail: script.error };
@@ -572,11 +586,18 @@ export const startComic = internalMutation({
   },
   returns: v.union(
     v.object({ ok: v.literal(true), comicId: v.id("comics") }),
-    v.object({ ok: v.literal(false), reason: v.union(v.literal("spend_cap"), v.literal("no_edition"), v.literal("taken"), v.literal("bad_script")) }),
+    v.object({
+      ok: v.literal(false),
+      reason: v.union(v.literal("spend_cap"), v.literal("no_edition"), v.literal("taken"), v.literal("bad_script"), v.literal("no_source")),
+    }),
   ),
   handler: async (ctx, { storyId, script, editionId, fresh, pooled, lockToken, replaceTop: replace }) => {
     const story = await ctx.db.get(storyId);
     if (!story) return { ok: false as const, reason: "taken" as const };
+    if (needsSource(story.kind) && !isRealSource(story.sourceUrl)) {
+      if (!story.used) await ctx.db.patch(storyId, { used: true, claimedAt: Date.now() });
+      return { ok: false as const, reason: "no_source" as const };
+    }
     const now = Date.now();
     const date = pacificDate(now);
     if (!(await reserve(ctx, date, IMAGES_PER_COMIC))) {
@@ -868,6 +889,7 @@ export const buildEdition = internalAction({
             ? await pickMemes(ctx, provider, need, inPaper, date)
             : await pickNews(ctx, provider, sectionName, need, inPaper, date);
         notes.push(picked.note);
+        if (picked.stories.length < need) await scheduleDeepSearch(ctx, [sectionName]);
         if (picked.stories.length === 0) continue;
         const ids = await ctx.runMutation(internal.pipeline.saveStories, { stories: picked.stories });
         const outcomes = await Promise.all(ids.slice(0, need).map((id) => writeComic(ctx, provider, id, { editionId: state.editionId })));
@@ -922,37 +944,29 @@ export async function fallbackPick(ctx: ActionCtx, provider: ScriptProvider, dat
 }
 
 export const WIDE_STORY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-export const SLOW_NEWS_SOURCE = "Doodle Daily newsroom";
+const ALL_SECTIONS: readonly Section[] = ["tech", "money", "culture", "memes"];
 
+async function lowStock(ctx: ActionCtx, sections: readonly Section[]): Promise<Section[]> {
+  const low: Section[] = [];
+  for (const s of sections) if ((await ctx.runQuery(internal.sourcing.stock, { section: s, now: Date.now() })) < DEEP_SEARCH_MIN) low.push(s);
+  return low;
+}
+
+export async function searchHarder(ctx: ActionCtx): Promise<string[]> {
+  const notes: string[] = [];
+  for (const s of await lowStock(ctx, ALL_SECTIONS)) {
+    const r = await deepSearch(ctx, s);
+    notes.push(`${s} deep search ${r.status}: found ${r.found}, verified ${r.verified}, dropped ${r.dropped}, saved ${r.saved}`);
+  }
+  return notes;
+}
+
+async function scheduleDeepSearch(ctx: ActionCtx, sections: readonly Section[]): Promise<void> {
+  for (const s of await lowStock(ctx, sections)) await ctx.scheduler.runAfter(0, internal.sourcing.run, { section: s });
+}
 export function demoMode(): boolean {
   return process.env.DEMO_MODE === "1";
 }
-
-const SLOW_NEWS_STORY: StoryInput = {
-  section: "culture",
-  kind: "news",
-  headline: "Slow news day in the newsroom",
-  facts: [
-    "It is a slow news day at the Doodle Daily newsroom.",
-    "Boss Blob, Coin, Robo, Newsie and The Crowd wait around the newsroom for a story to come in.",
-    "This strip is about the cast only and makes no claims about real events, people or companies.",
-  ],
-  itemIds: [],
-  sourceName: SLOW_NEWS_SOURCE,
-  sourceUrl: "",
-  score: 0,
-};
-
-const SLOW_NEWS_SCRIPT: Script = {
-  title: "Slow news day",
-  realStory: "Nothing new came in to the newsroom this time, so the cast waited for the next story.",
-  panels: [
-    { scene: "Newsie sits at a messy newsroom desk, staring at a silent telephone.", cast: ["Newsie"], caption: "The newsroom phone has not rung all morning." },
-    { scene: "Robo taps an empty screen while Boss Blob paces past the desks.", cast: ["Robo", "Boss Blob"], caption: "Robo refreshes the feed for the hundredth time." },
-    { scene: "Coin flips itself on a desk while The Crowd peeks in at the door.", cast: ["Coin", "The Crowd"], caption: "Coin suggests flipping for who writes the next story." },
-    { scene: "Newsie, Robo and Boss Blob share a box of crayons around one desk.", cast: ["Newsie", "Robo", "Boss Blob"], caption: "Slow news day. Robo draws the team instead." },
-  ],
-};
 
 type LiveOutcome = { ok: true; comicId: Id<"comics"> } | { ok: false; reason: "spend_cap" | "no_story" };
 
@@ -975,13 +989,8 @@ export async function drawLive(ctx: ActionCtx, provider: ScriptProvider, date: s
     if (outcome.ok) return outcome;
     if (outcome.reason === "spend_cap") return { ok: false, reason: "spend_cap" };
   }
-  const [storyId] = await ctx.runMutation(internal.pipeline.saveStories, { stories: [SLOW_NEWS_STORY] });
-  const written = await writeComic(ctx, provider, storyId, target);
-  if (written.ok) return written;
-  if (written.reason === "spend_cap") return { ok: false, reason: "spend_cap" };
-  const canned = await ctx.runMutation(internal.pipeline.startComic, { storyId, script: SLOW_NEWS_SCRIPT, ...target });
-  if (canned.ok) return canned;
-  return { ok: false, reason: canned.reason === "spend_cap" ? "spend_cap" : "no_story" };
+  await scheduleDeepSearch(ctx, ALL_SECTIONS);
+  return { ok: false, reason: "no_story" };
 }
 
 export const drawFreshOne = action({

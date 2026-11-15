@@ -162,8 +162,8 @@ describe("keiki tool endpoint", () => {
     await t.action(internal.pipeline.drawFromBrief, {
       headline: "Coffee prices hit a record high",
       facts: ["Coffee prices hit a record high this week.", "Beans cost more than ever."],
-      sourceName: "Example News",
-      sourceUrl: "https://news.example.com/coffee",
+      sourceName: "NPR",
+      sourceUrl: "https://www.npr.org/fixture/coffee",
       kind: "news",
     });
     await settleAll(t);
