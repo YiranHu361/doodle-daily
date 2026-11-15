@@ -91,17 +91,16 @@
 - **Fixtures** live in `src/data/fixtures/`: an 8-comic issue (two per section), a
   6-comic yesterday, one locked back issue, local 192 px pictures, in-memory
   reactions, and a simulated "Draw a fresh one" that fills in panel by panel.
-- **`pipeline:drawFreshOne`** is called by name (`makeFunctionReference`) because thread 2
-  has not deployed it yet; until it exists every press ends in "My crayon snapped.
-  Try again." The demo secret comes from `EXPO_PUBLIC_DEMO_SECRET`.
+- **`pipeline:drawFreshOne`** gets the demo secret from `EXPO_PUBLIC_DEMO_SECRET` at build time;
+  a build without it gets `bad_secret`, shown as "My crayon snapped. Try again."
 - **`editions:list` / `editions:byDate`** are called without `deviceId` (the deployed
   validators reject extra args). Thread 5 should add it in `src/data/hooks.ts` when the
   server accepts it; the app already decodes and honours `locked`.
 - **CelebrationHost** stays mounted once in the root layout rather than inside the
   Reader: the Reader is a pushed (non-modal) stack screen, so the root overlay draws
-  above it and keeps playing after the Reader closes. The Reader calls
-  `notifyReaderClosed()` and `notifyBusy()` through `src/components/celebrationBridge.ts`,
-  which only calls them if `src/streak/ui` exports them (thread 4 adds them).
+  above it and keeps playing after the Reader closes. The Reader and Share call
+  `notifyReaderClosed()` and `notifyBusy()` from `src/streak`. Launch reset also calls the
+  streak's `resetLocalState()` (combo, intro, device id).
 - **testIDs** with an index are 0-based: `comicCard_0`, `panel_0`..`panel_3`,
   `archiveRow_0`. Extra ids: `wordmark`, `todayList`, `realStoryThumb_{i}`,
   `offlineBanner`, `olderIssueBanner`, `buildingBanner`, `emptySection`,

@@ -2,8 +2,8 @@ import * as Sharing from "expo-sharing";
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from "react";
 import type { View } from "react-native";
 import { captureRef } from "react-native-view-shot";
-import { notifyBusy } from "../components/celebrationBridge";
 import type { Comic } from "../data/types";
+import { notifyBusy } from "../streak";
 import { ShareCard } from "./ShareCard";
 
 type OnReady = (view: ComponentRef<typeof View>) => void;

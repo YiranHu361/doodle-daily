@@ -16,7 +16,6 @@ import Animated, {
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useReducedMotion } from "../../src/components/a11y";
-import { notifyBusy, notifyReaderClosed } from "../../src/components/celebrationBridge";
 import { GridBackground } from "../../src/components/GridBackground";
 import { CloseIcon, CompassIcon, ShareIcon } from "../../src/components/icons";
 import { PaperSheet } from "../../src/components/Paper";
@@ -32,7 +31,7 @@ import { useIssue, useReactions } from "../../src/data/hooks";
 import { REAL_STORY_PAGE, shouldMarkRead } from "../../src/data/readTracker";
 import type { Comic, Panel } from "../../src/data/types";
 import { ShareHost, useShare } from "../../src/share/useShare";
-import { isRead, markComicRead, useCombo } from "../../src/streak";
+import { isRead, markComicRead, notifyBusy, notifyReaderClosed, useCombo } from "../../src/streak";
 import { colors, cut, sectionColor, space, springs, type } from "../../src/theme";
 import { copy } from "../../src/theme/copy";
 

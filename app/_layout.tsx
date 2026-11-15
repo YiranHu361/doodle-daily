@@ -1,7 +1,6 @@
 import { BalsamiqSans_400Regular } from "@expo-google-fonts/balsamiq-sans";
 import { Bungee_400Regular } from "@expo-google-fonts/bungee";
 import { ChakraPetch_400Regular, ChakraPetch_500Medium, ChakraPetch_600SemiBold } from "@expo-google-fonts/chakra-petch";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ConvexProvider } from "convex/react";
 import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
@@ -22,8 +21,6 @@ import { colors } from "../src/theme";
 
 void SplashScreen.preventAutoHideAsync();
 
-const INTRO_KEY = "dd.introSeen.v1";
-
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Bungee_400Regular,
@@ -35,10 +32,7 @@ export default function RootLayout() {
   const [flagsReady, setFlagsReady] = useState(false);
   const [introDone, setIntroDone] = useState(false);
 
-  const onIntroDone = useCallback(() => {
-    setIntroDone(true);
-    void AsyncStorage.setItem(INTRO_KEY, "1").catch(() => undefined);
-  }, []);
+  const onIntroDone = useCallback(() => setIntroDone(true), []);
 
   useEffect(() => {
     const off = onLocalReset(resetFixtures);
@@ -46,8 +40,7 @@ export default function RootLayout() {
       try {
         await applyFlags(envFlags());
         await applyFlagsFromUrl(await Linking.getInitialURL());
-        const seen = await AsyncStorage.getItem(INTRO_KEY).catch(() => null);
-        setIntroDone(getFlags().skipIntro || seen === "1");
+        if (getFlags().skipIntro) setIntroDone(true);
       } finally {
         setFlagsReady(true);
         void getDeviceId();

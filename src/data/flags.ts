@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSyncExternalStore } from "react";
 import { setFixedNow } from "./clock";
-import { resetDeviceId } from "./deviceId";
+import { resetLocalState as resetStreakAndIntro } from "../streak";
 import { DEFAULT_FLAGS, flagsFromEnv, flagsFromUrl, type LaunchFlags } from "./flagsParse";
 
 let current: LaunchFlags = { ...DEFAULT_FLAGS };
@@ -29,7 +29,7 @@ export function onLocalReset(listener: () => void): () => void {
 
 export async function resetLocalState(): Promise<void> {
   await AsyncStorage.clear().catch(() => undefined);
-  await resetDeviceId();
+  await resetStreakAndIntro().catch(() => undefined);
   resetListeners.forEach((l) => l());
 }
 

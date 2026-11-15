@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAction, useMutation, useQuery } from "convex/react";
-import { makeFunctionReference } from "convex/server";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
@@ -16,8 +15,6 @@ import { DRAW_TIMEOUT_MS, REACTION_TIMEOUT_MS, TimeoutError, withTimeout } from 
 import type { Comic, Edition, EditionSummary, ReactionCounts, ReactionKind } from "./types";
 
 const CACHE_KEY = "dd.lastIssue.v1";
-
-const drawFreshOne = makeFunctionReference<"action", { deviceId: string; secret: string }, unknown>("pipeline:drawFreshOne");
 
 function useFixtureVersion(): number {
   return useSyncExternalStore(fixtureStore.subscribe, fixtureStore.version);
@@ -139,7 +136,7 @@ export function useDrawFresh(
 ): { state: DrawState; busy: boolean; start: () => void } {
   const { fixtures } = useFlags();
   const deviceId = useDeviceId();
-  const action = useAction(drawFreshOne);
+  const action = useAction(api.pipeline.drawFreshOne);
   const [state, dispatch] = useReducer(drawReducer, initialDrawState);
   const handlersRef = useRef(handlers);
   useEffect(() => {
