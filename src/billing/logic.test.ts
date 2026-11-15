@@ -31,6 +31,7 @@ describe("billing logic", () => {
   test("a refused topic says why in plain words", () => {
     expect(refusalMessage("tragedy")).toMatch(/crime and tragedy/);
     expect(refusalMessage("needs_source")).toMatch(/Paste a link/);
+    expect(refusalMessage("unreadable_link")).toBe("Robo could not open that page. Type the headline instead.");
     expect(refusalMessage(undefined)).toBeNull();
     expect(startFailMessage("not_allowed")).toBe("Robo skips stories about private lives, crime and tragedy. Try another topic.");
   });

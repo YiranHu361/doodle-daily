@@ -18,6 +18,42 @@ const WATCH_EVERY_MS = 20_000;
 const WATCH_LIMIT = 75;
 export const COMMISSION_SOURCE = "Commissioned by a reader";
 export const NEEDS_SOURCE_MESSAGE = "That one needs a source. Paste a link to the article and Robo will draw it.";
+export const UNREADABLE_LINK_MESSAGE = "Robo could not open that page. Type the headline instead.";
+
+const PUBLISHERS: Record<string, string> = {
+  "wsj.com": "The Wall Street Journal",
+  "nytimes.com": "The New York Times",
+  "bloomberg.com": "Bloomberg",
+  "ft.com": "Financial Times",
+  "reuters.com": "Reuters",
+  "washingtonpost.com": "The Washington Post",
+  "theinformation.com": "The Information",
+  "economist.com": "The Economist",
+  "businessinsider.com": "Business Insider",
+  "cnbc.com": "CNBC",
+};
+
+export function publisherFor(link: string): string {
+  const host = new URL(link).hostname.toLowerCase().replace(/^www\./, "");
+  const known = Object.keys(PUBLISHERS).find((domain) => host === domain || host.endsWith(`.${domain}`));
+  return known ? PUBLISHERS[known] : host;
+}
+
+export function slugHeadline(link: string): string | null {
+  const segment = new URL(link).pathname.split("/").filter(Boolean).pop() ?? "";
+  let slug = segment;
+  try {
+    slug = decodeURIComponent(segment);
+  } catch {}
+  const words = slug
+    .replace(/\.[a-z0-9]+$/i, "")
+    .replace(/-(?=[a-z0-9]*\d)[a-z0-9]{6,}$/i, "")
+    .split(/[-_\s]+/)
+    .filter(Boolean);
+  if (words.length < 4) return null;
+  const text = words.join(" ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
 
 export type PageMeta = { title: string; description: string };
 
@@ -52,12 +88,26 @@ export function parseLink(raw: string): string | null {
   }
 }
 
+export type LinkRead = { page: PageMeta; publisher: string; slug: { headline: string; fact: string } | null };
+
+export async function readLink(link: string): Promise<LinkRead | null> {
+  const res = await fetchText(link, { headers: USER_AGENT_HEADERS, timeoutMs: 6000 });
+  const page = res.ok ? pageMeta(res.text) : { title: "", description: "" };
+  const siteName = res.ok ? decodeEntities(metaContent(res.text.slice(0, 200_000), ["og:site_name"])).replace(/\s+/g, " ").trim() : "";
+  const publisher = cut(siteName, 80) || publisherFor(link);
+  if (page.title) return { page, publisher, slug: null };
+  const headline = slugHeadline(link);
+  return headline ? { page, publisher, slug: { headline, fact: `${publisher} reports: ${headline}.` } } : null;
+}
+
 const startResult = v.union(
   v.object({ ok: v.literal(true), commissionId: v.id("commissions"), url: v.string() }),
   v.object({
     ok: v.literal(false),
     reason: v.union(v.literal("not_allowed"), v.literal("spend_cap"), v.literal("bad_input"), v.literal("unavailable")),
-    refusal: v.optional(v.union(v.literal("needs_source"), v.literal("private_life"), v.literal("tragedy"), v.literal("private_person"))),
+    refusal: v.optional(
+      v.union(v.literal("needs_source"), v.literal("private_life"), v.literal("tragedy"), v.literal("private_person"), v.literal("unreadable_link")),
+    ),
     message: v.optional(v.string()),
   }),
 );
@@ -93,33 +143,34 @@ export const start = action({
     let link: string | undefined;
     let page: PageMeta = { title: "", description: "" };
     let publisher = "";
+    let slug: LinkRead["slug"] = null;
     if (rawLink) {
       const parsed = parseLink(rawLink);
       if (!parsed) return { ok: false, reason: "bad_input" };
       link = parsed;
-      const res = await fetchText(parsed, { headers: USER_AGENT_HEADERS, timeoutMs: 6000 });
-      if (res.ok) page = pageMeta(res.text);
-      if (!page.title) return { ok: false, reason: "bad_input" };
-      const siteName = res.ok ? decodeEntities(metaContent(res.text.slice(0, 200_000), ["og:site_name"])).replace(/\s+/g, " ").trim() : "";
-      publisher = cut(siteName, 80) || new URL(parsed).hostname.replace(/^www\./, "");
+      const read = await readLink(parsed);
+      if (!read) return { ok: false, reason: "bad_input", refusal: "unreadable_link", message: UNREADABLE_LINK_MESSAGE };
+      ({ page, publisher, slug } = read);
     }
-    const headline = topic || page.title;
-    const facts = [
-      ...new Set(
-        [
-          page.title ? `The linked page is titled ${page.title.replace(/[.!?]+$/, "")}.` : "",
-          page.description,
-          publisher ? `The article was published by ${publisher}.` : "",
-          topic ? `A reader commissioned a comic about ${topic.replace(/[.!?]+$/, "")}.` : "",
-          "The reader wants a light, friendly four-panel strip about it.",
-        ].filter(Boolean),
-      ),
-    ];
+    const headline = topic || page.title || slug?.headline || "";
+    const facts = slug
+      ? [slug.fact]
+      : [
+          ...new Set(
+            [
+              page.title ? `The linked page is titled ${page.title.replace(/[.!?]+$/, "")}.` : "",
+              page.description,
+              publisher ? `The article was published by ${publisher}.` : "",
+              topic ? `A reader commissioned a comic about ${topic.replace(/[.!?]+$/, "")}.` : "",
+              "The reader wants a light, friendly four-panel strip about it.",
+            ].filter(Boolean),
+          ),
+        ];
     const refusal = storyRefusal(`${headline} ${facts.join(" ")}`, { sourced: !!link });
     if (refusal) return { ok: false, reason: "not_allowed", refusal, ...(refusal === "needs_source" ? { message: NEEDS_SOURCE_MESSAGE } : {}) };
     if ((await ctx.runQuery(internal.pipeline.capLeft, { date: pacificDate(Date.now()) })) < IMAGES_PER_COMIC) return { ok: false, reason: "spend_cap" };
     if (!whopConfig().ok) return { ok: false, reason: "unavailable" };
-    const commissionId = await ctx.runMutation(internal.commissions.create, { deviceId: args.deviceId, topic: topic || page.title, link, headline, facts });
+    const commissionId = await ctx.runMutation(internal.commissions.create, { deviceId: args.deviceId, topic: headline, link, headline, facts });
     const checkout = await createCheckout(planId("commission"), { kind: "commission", deviceId: args.deviceId, commissionId });
     await ctx.runMutation(internal.commissions.attachCheckout, { commissionId, checkoutId: checkout.ok ? checkout.id : undefined });
     if (!checkout.ok) {
