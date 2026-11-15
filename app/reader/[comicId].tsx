@@ -32,6 +32,7 @@ import { PrimaryButton, ReadStamp, SecondaryButton, SectionTag } from "../../src
 import { useComicById, useIssue, useReactions } from "../../src/data/hooks";
 import { REAL_STORY_PAGE, shouldMarkRead } from "../../src/data/readTracker";
 import type { Comic, Panel } from "../../src/data/types";
+import { QuizPage } from "../../src/quiz/QuizPage";
 import { storyLink } from "../../src/share/link";
 import { ShareHost, useShare } from "../../src/share/useShare";
 import { isRead, markComicRead, notifyBusy, notifyReaderClosed, useCombo } from "../../src/streak";
@@ -39,7 +40,7 @@ import { colors, cut, sectionColor, space, springs, type } from "../../src/theme
 import { copy } from "../../src/theme/copy";
 import { SpeakerButton, useNarration, useVoiceSetting } from "../../src/voice";
 
-const PAGES = 5;
+const PAGES = 6;
 
 function PanelPage({
   comicId,
@@ -339,6 +340,7 @@ function ReaderView({ comic }: { comic: Comic }) {
                   onShare={share.share}
                   onCopyLink={() => void copyLink()}
                 />
+                <QuizPage comic={comic} width={width} active={page === PAGES - 1} />
               </Animated.ScrollView>
             ) : null}
           </View>

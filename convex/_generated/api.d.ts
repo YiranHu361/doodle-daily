@@ -46,6 +46,7 @@ import type * as providers_openai from "../providers/openai.js";
 import type * as providers_placeholder from "../providers/placeholder.js";
 import type * as providers_prompts from "../providers/prompts.js";
 import type * as providers_types from "../providers/types.js";
+import type * as quiz from "../quiz.js";
 import type * as reactions from "../reactions.js";
 import type * as seed from "../seed.js";
 import type * as seedData from "../seedData.js";
@@ -97,6 +98,7 @@ declare const fullApi: ApiFromModules<{
   "providers/placeholder": typeof providers_placeholder;
   "providers/prompts": typeof providers_prompts;
   "providers/types": typeof providers_types;
+  quiz: typeof quiz;
   reactions: typeof reactions;
   seed: typeof seed;
   seedData: typeof seedData;

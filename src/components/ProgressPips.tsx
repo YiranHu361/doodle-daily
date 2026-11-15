@@ -23,9 +23,9 @@ function Pip({ active, seen, color, dot }: { active: boolean; seen: boolean; col
 
 export function ProgressPips({ page, seen, color }: { page: number; seen: ReadonlySet<number>; color: string }) {
   return (
-    <View style={styles.row} accessible accessibilityLabel={page < 4 ? `Panel ${page + 1} of 4` : "The real story"}>
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Pip key={i} active={i === page} seen={seen.has(i)} color={color} dot={i === 4} />
+    <View style={styles.row} accessible accessibilityLabel={page < 4 ? `Panel ${page + 1} of 4` : page === 4 ? "The real story" : "Quick question"}>
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <Pip key={i} active={i === page} seen={seen.has(i)} color={color} dot={i >= 4} />
       ))}
     </View>
   );
