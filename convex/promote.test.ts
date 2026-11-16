@@ -206,7 +206,7 @@ describe("promote:check and promote:start", () => {
     await pay(t, res.commissionId);
     await settle(t, 30_000);
     const today = (await t.query(api.editions.today, {}))!;
-    expect(today.comics[1]).toMatchObject({ sponsored: true, unverified: false, section: "money", sourceUrl: dead, sourceName: "gone-for-good.app" });
+    expect(today.comics[0]).toMatchObject({ sponsored: true, unverified: false, section: "money", sourceUrl: dead, sourceName: "gone-for-good.app" });
   });
 
   test("ad rules refuse at start and nothing is charged", async () => {
@@ -229,7 +229,7 @@ describe("promote:check and promote:start", () => {
 });
 
 describe("a paid promo", () => {
-  test("ends as a public sponsored comic, second in the issue; an unpaid one never appears", async () => {
+  test("ends as a public sponsored comic, top of the issue; an unpaid one never appears", async () => {
     const t = convexTest(schema, modules);
     await seedIssue(t);
     const unpaid = await t.action(api.promote.start, { deviceId: DEVICE, persona: "creator", section: "culture", brief: BRIEF, link: PRODUCT_URL });
@@ -241,8 +241,8 @@ describe("a paid promo", () => {
     expect(mine.find((m) => m._id === paid.commissionId)).toMatchObject({ status: "ready" });
     expect(mine.find((m) => m._id === unpaid.commissionId)).toMatchObject({ status: "awaiting_payment" });
     const today = (await t.query(api.editions.today, { deviceId: "device-stranger-1" }))!;
-    expect(today.comics.map((c) => c.title)).toEqual(["The lead", expect.any(String), "The second", "The third"]);
-    expect(today.comics[1]).toMatchObject({
+    expect(today.comics.map((c) => c.title)).toEqual([expect.any(String), "The lead", "The second", "The third"]);
+    expect(today.comics[0]).toMatchObject({
       kind: "commission",
       section: "memes",
       sponsored: true,
@@ -254,8 +254,8 @@ describe("a paid promo", () => {
       unverified: false,
       isNew: false,
     });
-    expect(today.comics[0].sponsored).toBe(false);
-    const comic = await t.run(async (ctx) => ctx.db.get(today.comics[1]._id));
+    expect(today.comics[1].sponsored).toBe(false);
+    const comic = await t.run(async (ctx) => ctx.db.get(today.comics[0]._id));
     expect(comic!.owner).toBeUndefined();
   });
 

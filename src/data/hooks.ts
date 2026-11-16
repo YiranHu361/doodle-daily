@@ -38,6 +38,13 @@ function useCachedIssue(): Edition | null {
   return cached;
 }
 
+export function useMyComicIds(): Set<string> {
+  const { fixtures } = useFlags();
+  const deviceId = useDeviceId();
+  const rows = useQuery(api.commissions.mine, !fixtures && deviceId ? { deviceId } : "skip");
+  return useMemo(() => new Set((rows ?? []).flatMap((r) => (r.comicId ? [r.comicId] : []))), [rows]);
+}
+
 export function useToday(enabled = true): ScreenState<Edition> {
   const { fixtures } = useFlags();
   const version = useFixtureVersion();

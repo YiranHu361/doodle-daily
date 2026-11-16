@@ -321,7 +321,7 @@ export function DoneStep({ state, onDone }: { state: PromoState; onDone: () => v
         <Text testID="promoDone" style={styles.briefName} accessibilityLiveRegion="polite">
           {doneLine(state.section)}
         </Text>
-        <Text style={styles.hint}>Second in today&apos;s paper, for every reader.</Text>
+        <Text style={styles.hint}>Top of today&apos;s paper, for every reader.</Text>
       </CutBox>
       <PrimaryButton testID="promoShare" label={comic ? "Share" : "Getting your comic"} onPress={share.share} disabled={!comic || share.sharing} />
       <QuietLink testID="promoClose" label="Done" onPress={onDone} />

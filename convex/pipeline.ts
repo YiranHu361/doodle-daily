@@ -541,15 +541,19 @@ function scriptWords(script: Script): string {
   return [script.title, script.realStory, ...script.panels.map((p) => p.caption)].join(" ");
 }
 
-async function secondSlot(ctx: MutationCtx, editionId: Id<"editions">): Promise<number> {
-  const comics = await ctx.db
+async function topSlot(ctx: MutationCtx, editionId: Id<"editions">): Promise<number> {
+  const first = await ctx.db
     .query("comics")
     .withIndex("by_edition_order", (q) => q.eq("editionId", editionId))
-    .take(64);
-  const leadAt = comics.findIndex((c) => c.status !== "failed" && c.hidden !== true && c.pooled !== true && c.replacedAt === undefined && (c.kind !== "commission" || c.sponsored === true) && c.kind !== "paper-sample");
-  if (leadAt < 0) return comics.length ? comics[comics.length - 1].order + 1 : 0;
-  const next = comics[leadAt + 1];
-  return next ? (comics[leadAt].order + next.order) / 2 : comics[leadAt].order + 1;
+    .first();
+  return first ? first.order - 1 : 0;
+}
+
+export async function belowSponsored(ctx: MutationCtx, editionId: Id<"editions">): Promise<number> {
+  const comics = await editionComics(ctx, editionId);
+  const at = comics.findIndex((c) => c.sponsored !== true);
+  if (at < 0) return comics.length ? comics[comics.length - 1].order + 1 : 0;
+  return at === 0 ? comics[0].order - 1 : (comics[at - 1].order + comics[at].order) / 2;
 }
 
 type WriteOutcome = { ok: true; comicId: Id<"comics"> } | { ok: false; reason: "taken" | "bad_script" | "spend_cap" | "no_edition" | "no_source" };
@@ -612,10 +616,10 @@ export const startComic = internalMutation({
     const existing = await ctx.db
       .query("comics")
       .withIndex("by_edition_order", (q) => q.eq("editionId", edition._id))
-      .order(fresh ? "asc" : "desc")
+      .order("desc")
       .first();
     const replaced = replace && !story.sponsored ? await replaceTop(ctx, edition._id, now) : null;
-    const order = story.sponsored ? await secondSlot(ctx, edition._id) : replaced ? replaced.order : existing ? existing.order + (fresh ? -1 : 1) : 0;
+    const order = story.sponsored ? await topSlot(ctx, edition._id) : replaced ? replaced.order : fresh ? await belowSponsored(ctx, edition._id) : existing ? existing.order + 1 : 0;
     const comicId = await ctx.db.insert("comics", {
       editionId: edition._id,
       storyId,

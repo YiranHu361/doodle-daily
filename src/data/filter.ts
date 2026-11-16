@@ -8,9 +8,10 @@ export function filterComics(comics: readonly Comic[], chip: Chip): Comic[] {
 }
 
 export function orderForToday(comics: readonly Comic[], pinnedId: string | null): Comic[] {
-  const pinned = (c: Comic) => c._id === pinnedId || c.isNew;
+  const sponsored = comics.filter((c) => c.sponsored);
+  const pinned = (c: Comic) => !c.sponsored && (c._id === pinnedId || c.isNew);
   const top = comics.filter(pinned).sort((a, b) => b.createdAt - a.createdAt);
-  return [...top, ...comics.filter((c) => !pinned(c))];
+  return [...sponsored, ...top, ...comics.filter((c) => !c.sponsored && !pinned(c))];
 }
 
 export const DRAWING_SLOT = "drawing";

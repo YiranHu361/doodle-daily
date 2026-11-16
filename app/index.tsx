@@ -22,7 +22,7 @@ import { now, formatIssueDate, pacificDate } from "../src/data/clock";
 import { restartColdStartWindow } from "../src/data/connectionHooks";
 import { drawingInLead, drawMessage, type DrawFailure } from "../src/data/drawFlow";
 import { DRAWING_SLOT, filterComics, orderForToday, stillDrawing, withDrawingLead, type Chip } from "../src/data/filter";
-import { useDrawFresh, useToday } from "../src/data/hooks";
+import { useDrawFresh, useMyComicIds, useToday } from "../src/data/hooks";
 import { newsieSmsUrl } from "../src/data/newsie";
 import type { Comic, Edition } from "../src/data/types";
 import { TrophyButton } from "../src/quiz/TrophyButton";
@@ -98,6 +98,7 @@ function TodayScreen() {
   const known = useRef<Set<string> | null>(null);
   const edition = today.kind === "ready" ? today.data : null;
   const comics = useMemo(() => edition?.comics ?? [], [edition]);
+  const mine = useMyComicIds();
 
   const onFailed = useCallback(
     (reason: DrawFailure) => {
@@ -134,6 +135,11 @@ function TodayScreen() {
     if (draw.state.phase === "requesting") scroller.current?.scrollTo({ y: chipY, animated: !reduce });
   }, [draw.state.phase, chipY, reduce]);
 
+  const onPromoted = useCallback(() => {
+    setChip("all");
+    scroller.current?.scrollTo({ y: chipY, animated: !reduce });
+  }, [chipY, reduce]);
+
   const newsieUrl = newsieSmsUrl();
   const open = (c: Comic) => router.push({ pathname: "/reader/[comicId]", params: { comicId: c._id } });
   void combo;
@@ -163,7 +169,7 @@ function TodayScreen() {
             c === DRAWING_SLOT ? (
               <DrawingCard key={DRAWING_SLOT} lead={i === 0} />
             ) : (
-              <ComicCard key={c._id} comic={c} index={i} lead={i === 0} read={isRead(c._id)} fresh={c._id === freshId} onPress={() => open(c)} />
+              <ComicCard key={c._id} comic={c} index={i} lead={i === 0} read={isRead(c._id)} fresh={c._id === freshId} mine={mine.has(c._id)} onPress={() => open(c)} />
             ),
           )
         )}
@@ -191,7 +197,7 @@ function TodayScreen() {
         </ScrollView>
       </SafeAreaView>
       <Animated.View pointerEvents="box-none" style={[StyleSheet.absoluteFill, launch.dock]}>
-        <Dock ref={dock} busy={draw.busy} onDraw={draw.start} />
+        <Dock ref={dock} busy={draw.busy} onDraw={draw.start} onPromoted={onPromoted} />
       </Animated.View>
       <ComboSheet visible={sheet} onClose={() => setSheet(false)} />
       <PaywallSheet
