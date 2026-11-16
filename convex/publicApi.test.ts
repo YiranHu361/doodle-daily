@@ -3,6 +3,8 @@ import { expect, test } from "vitest";
 
 const PUBLIC_ALLOW_LIST = [
   "billing:claimComboReward",
+  "billing:payTest",
+  "billing:payTestPlus",
   "billing:startPlusCheckout",
   "billing:status",
   "billing:useFreeze",

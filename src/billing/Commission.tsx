@@ -7,8 +7,9 @@ import { PrimaryButton, PulsingDots } from "../components/ui";
 import { CutBox } from "../components/shapes";
 import { Robo } from "../robo/Robo";
 import { colors, cut, type } from "../theme";
-import { openCheckout, useBillingDevice } from "./hooks";
-import { commissionArgs, commissionLine, refusalMessage, startFailMessage, TOPIC_MAX, type CommissionStatus } from "./logic";
+import { openCheckout, useBillingDevice, usePlus } from "./hooks";
+import { commissionArgs, commissionLine, paymentErrorLine, refusalMessage, startFailMessage, TOPIC_MAX, type CommissionStatus } from "./logic";
+import { PayButtons, useTestPay } from "./PayButtons";
 import { ChatStep, DoneStep, LinkStep, SectionStep, StatusStep, WhoStep } from "./promote/Steps";
 import { canGoBack, initialPromoState, promoReducer, stepLine, stepTitle } from "./promoteLogic";
 import { BillingSheet, PencilIcon, QuietLink, SheetHeader, SmallButton } from "./Sheet";
@@ -83,11 +84,16 @@ function CommissionSheet(props: SheetProps) {
 function PrivateCreate({ deviceId, visible, commissionId, onStarted, onClose, onFinished, children }: SheetProps & { children: ReactNode }) {
   const toast = useToast();
   const start = useAction(api.commissions.start);
+  const testPay = useTestPay(deviceId);
+  const { testCard } = usePlus();
   const mine = useQuery(api.commissions.mine, commissionId ? { deviceId } : "skip");
   const [text, setText] = useState("");
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const status = (mine?.find((c) => c._id === commissionId)?.status ?? (commissionId ? "awaiting_payment" : null)) as CommissionStatus | null;
+  const item = mine?.find((c) => c._id === commissionId);
+  const status = (item?.status ?? (commissionId ? "awaiting_payment" : null)) as CommissionStatus | null;
+  const payError = status === "awaiting_payment" ? (error ?? paymentErrorLine(item?.paymentError)) : null;
 
   useEffect(() => {
     if (status !== "ready") return;
@@ -100,18 +106,28 @@ function PrivateCreate({ deviceId, visible, commissionId, onStarted, onClose, on
     return () => clearTimeout(t);
   }, [status, toast, onFinished, onClose]);
 
-  const pay = async () => {
-    if (busy || !text.trim()) return;
+  const ensureCommission = async (): Promise<{ id: string; url: string | null } | null> => {
+    if (commissionId) return { id: commissionId, url: checkoutUrl };
+    const res = await start({ deviceId, ...commissionArgs(text) });
+    if (!res.ok) {
+      setError(res.message ?? refusalMessage(res.refusal) ?? startFailMessage(res.reason));
+      return null;
+    }
+    onStarted(res.commissionId);
+    setCheckoutUrl(res.url);
+    return { id: res.commissionId, url: res.url };
+  };
+
+  const pay = async (how: "test" | "checkout") => {
+    if (busy || (!commissionId && !text.trim())) return;
     setError(null);
     setBusy(true);
     try {
-      const res = await start({ deviceId, ...commissionArgs(text) });
-      if (!res.ok) {
-        setError(res.message ?? refusalMessage(res.refusal) ?? startFailMessage(res.reason));
-        return;
-      }
-      onStarted(res.commissionId);
-      await openCheckout(res.url);
+      const c = await ensureCommission();
+      if (!c) return;
+      if (how === "test") setError(await testPay(c.id));
+      else if (c.url) await openCheckout(c.url);
+      else setError(startFailMessage("unavailable"));
     } catch {
       setError(startFailMessage("error"));
     } finally {
@@ -121,8 +137,24 @@ function PrivateCreate({ deviceId, visible, commissionId, onStarted, onClose, on
 
   const reset = () => {
     setText("");
+    setCheckoutUrl(null);
+    setError(null);
     onFinished();
   };
+
+  const buttons = (
+    <PayButtons
+      testID="commissionPay"
+      testCard={testCard}
+      price="$1"
+      checkoutLabel="Pay $1 and draw it"
+      busy={busy}
+      disabled={!commissionId && !text.trim()}
+      error={commissionId ? null : error}
+      onTestPay={() => void pay("test")}
+      onCheckout={() => void pay("checkout")}
+    />
+  );
 
   return (
     <BillingSheet visible={visible} onClose={onClose} testID="commissionSheet">
@@ -130,14 +162,16 @@ function PrivateCreate({ deviceId, visible, commissionId, onStarted, onClose, on
       {children}
       {status ? (
         <View style={styles.statusBox}>
-          <CutBox cut={cut.card} fill={colors.surface[2]} stroke={status === "failed" || status === "refunded" ? colors.state.error : colors.neon.volt} style={styles.status}>
+          <CutBox cut={cut.card} fill={colors.surface[2]} stroke={payError || status === "failed" || status === "refunded" ? colors.state.error : colors.neon.volt} style={styles.status}>
             <View style={styles.statusRow}>
-              {DONE.includes(status) ? null : <PulsingDots color={colors.neon.volt} />}
-              <Text testID="commissionStatus" style={styles.statusText} accessibilityLiveRegion="polite">
-                {commissionLine(status)}
+              {DONE.includes(status) || payError ? null : <PulsingDots color={colors.neon.volt} />}
+              <Text testID="commissionStatus" style={styles.statusText} accessibilityLiveRegion="polite" numberOfLines={payError ? 2 : undefined}>
+                {payError ?? (status === "awaiting_payment" && testCard ? "Paying through Whop sandbox" : commissionLine(status))}
               </Text>
             </View>
           </CutBox>
+          {payError ? buttons : null}
+          {status === "failed" || status === "refunded" || payError ? <QuietLink label="Start over" onPress={reset} /> : null}
           {status === "failed" || status === "refunded" ? <PrimaryButton label="Try another" onPress={reset} /> : null}
         </View>
       ) : (
@@ -156,9 +190,7 @@ function PrivateCreate({ deviceId, visible, commissionId, onStarted, onClose, on
             accessibilityLabel="Paste a link or type a topic"
           />
           <Text style={styles.hint}>A topic up to {TOPIC_MAX} characters, like &quot;our seed round&quot;, or a link to an article.</Text>
-          <PrimaryButton testID="commissionPay" label={busy ? "Opening checkout" : "Pay $1 and draw it"} onPress={() => void pay()} disabled={busy || !text.trim()} />
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Text style={styles.fine}>Test mode: Whop sandbox, no real money. Card 4242 4242 4242 4242.</Text>
+          {buttons}
         </>
       )}
     </BillingSheet>
@@ -182,6 +214,4 @@ const styles = StyleSheet.create({
   status: { padding: 16 },
   statusRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   statusText: { ...type.body, color: colors.text.hi, flex: 1 },
-  error: { ...type.body, fontSize: 15, color: colors.state.error },
-  fine: { ...type.meta, color: colors.text.low, textAlign: "center" },
 });

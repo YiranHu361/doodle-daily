@@ -55,6 +55,7 @@ export type PromoState = {
   check: LinkCheck | null;
   unchecked: boolean;
   commissionId: string | null;
+  checkoutUrl: string | null;
   comicId: string | null;
   pending: Pending;
   error: string | null;
@@ -71,6 +72,7 @@ export const initialPromoState: PromoState = {
   check: null,
   unchecked: false,
   commissionId: null,
+  checkoutUrl: null,
   comicId: null,
   pending: null,
   error: null,
@@ -89,7 +91,7 @@ export type PromoAction =
   | { type: "checked"; check: LinkCheck }
   | { type: "tryAnotherLink" }
   | { type: "continueUnchecked" }
-  | { type: "started"; commissionId: string }
+  | { type: "started"; commissionId: string; checkoutUrl: string }
   | { type: "ready"; comicId: string | null }
   | { type: "error"; message: string }
   | { type: "reset" };
@@ -128,7 +130,7 @@ export function promoReducer(state: PromoState, action: PromoAction): PromoState
     case "continueUnchecked":
       return state.check && !state.check.readable ? { ...state, unchecked: true } : state;
     case "started":
-      return { ...state, step: "status", commissionId: action.commissionId, pending: null, error: null };
+      return { ...state, step: "status", commissionId: action.commissionId, checkoutUrl: action.checkoutUrl, pending: null, error: null };
     case "ready":
       return state.step === "status" ? { ...state, step: "done", comicId: action.comicId } : state;
     case "error":

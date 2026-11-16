@@ -1,11 +1,12 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalAction, internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
+import { action, internalAction, internalMutation, internalQuery, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { addDays, isIsoDate, pacificDate } from "./lib/dates";
 import { checkDeviceId, isDeviceId } from "./lib/device";
 import { cut } from "./lib/text";
-import { createCheckout, isValidMembership, parseMembership, planId, stringRecord, whop, whopConfig, type Membership } from "./lib/whop";
+import { constantTimeEqual } from "./lib/retry";
+import { createCheckout, failureMessage, isValidMembership, parseMembership, paymentOutcome, payWithTestCard, planId, stringRecord, testCardConfig, whop, whopConfig, type Membership } from "./lib/whop";
 import { entitlementKind } from "./schema";
 
 export const FREE_DRAWS_PER_DAY = 1;
@@ -40,6 +41,7 @@ const statusResult = v.object({
   freeDrawsLeftToday: v.union(v.number(), v.null()),
   freezesLeftThisWeek: v.number(),
   freeDaysEarned: v.number(),
+  testCard: v.boolean(),
 });
 
 export const status = query({
@@ -67,6 +69,7 @@ export const status = query({
       freeDrawsLeftToday: plus ? null : Math.max(0, FREE_DRAWS_PER_DAY - (draws?.count ?? 0)),
       freezesLeftThisWeek: plus ? Math.max(0, 1 - freezes.length) : 0,
       freeDaysEarned: claims.filter((c) => c.status === "paid").length,
+      testCard: testCardConfig().ok,
     };
   },
 });
@@ -235,6 +238,168 @@ export const claimComboReward = action({
   },
 });
 
+// ---------- sandbox test card ----------
+
+export const TEST_PAYMENTS_PER_DAY = 10;
+const WATCHDOG_MS = 60_000;
+const PAY_LOCK_MS = 90_000;
+
+const payTestResult = v.union(
+  v.object({ ok: v.literal(true), paymentId: v.string() }),
+  v.object({
+    ok: v.literal(false),
+    reason: v.union(v.literal("unavailable"), v.literal("bad_secret"), v.literal("not_found"), v.literal("already_paying"), v.literal("already_plus"), v.literal("limit"), v.literal("declined")),
+    message: v.optional(v.string()),
+  }),
+);
+type PayTestResult = typeof payTestResult.type;
+
+function demoSecretOk(secret: string): boolean {
+  const expected = process.env.DEMO_SECRET ?? "";
+  return !!expected && constantTimeEqual(secret, expected);
+}
+
+async function takeTestPayment(ctx: MutationCtx, deviceId: string, plus: boolean): Promise<boolean> {
+  const date = pacificDate(Date.now());
+  const row = await ctx.db
+    .query("testPayments")
+    .withIndex("by_device_date", (q) => q.eq("deviceId", deviceId).eq("date", date))
+    .unique();
+  if ((row?.count ?? 0) >= TEST_PAYMENTS_PER_DAY) return false;
+  const now = Date.now();
+  if (plus && row?.plusAt !== undefined && now - row.plusAt < PAY_LOCK_MS) return false;
+  const patch = plus ? { plusAt: now } : {};
+  if (row) await ctx.db.patch(row._id, { count: row.count + 1, ...patch });
+  else await ctx.db.insert("testPayments", { deviceId, date, count: 1, ...patch });
+  return true;
+}
+
+export const reserveTestPayment = internalMutation({
+  args: { deviceId: v.string(), commissionId: v.string() },
+  returns: v.union(
+    v.object({ ok: v.literal(true), commissionId: v.id("commissions"), plan: v.union(v.literal("promo"), v.literal("commission")) }),
+    v.object({ ok: v.literal(false), reason: v.union(v.literal("not_found"), v.literal("already_paying"), v.literal("limit")) }),
+  ),
+  handler: async (ctx, { deviceId, commissionId }) => {
+    const id = ctx.db.normalizeId("commissions", commissionId);
+    const row = id ? await ctx.db.get(id) : null;
+    if (!row || row.deviceId !== deviceId) return { ok: false as const, reason: "not_found" as const };
+    if (row.status !== "awaiting_payment") return { ok: false as const, reason: "already_paying" as const };
+    if (!row.error && (row.whopPaymentId || (row.testPayAt !== undefined && Date.now() - row.testPayAt < PAY_LOCK_MS))) return { ok: false as const, reason: "already_paying" as const };
+    if (!(await takeTestPayment(ctx, deviceId, false))) return { ok: false as const, reason: "limit" as const };
+    await ctx.db.patch(row._id, { testPayAt: Date.now(), whopPaymentId: undefined, error: undefined, updatedAt: Date.now() });
+    return { ok: true as const, commissionId: row._id, plan: row.promo ? ("promo" as const) : ("commission" as const) };
+  },
+});
+
+export const recordTestPayment = internalMutation({
+  args: { commissionId: v.id("commissions"), paymentId: v.optional(v.string()), error: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, { commissionId, paymentId, error }) => {
+    const row = await ctx.db.get(commissionId);
+    if (!row || row.status !== "awaiting_payment") return null;
+    if (paymentId) {
+      if (!row.whopPaymentId) await ctx.db.patch(commissionId, { whopPaymentId: paymentId, updatedAt: Date.now() });
+      await ctx.scheduler.runAfter(WATCHDOG_MS, internal.billing.testPaymentWatchdog, { paymentId, deviceId: row.deviceId, commissionId });
+    } else {
+      await ctx.db.patch(commissionId, { error: cut(`payment failed: ${error ?? "unknown"}`, 300), updatedAt: Date.now() });
+    }
+    return null;
+  },
+});
+
+export const payTest = action({
+  args: { deviceId: v.string(), secret: v.string(), commissionId: v.string() },
+  returns: payTestResult,
+  handler: async (ctx, { deviceId, secret, commissionId }): Promise<PayTestResult> => {
+    checkDeviceId(deviceId);
+    if (!testCardConfig().ok) return { ok: false, reason: "unavailable" };
+    if (!demoSecretOk(secret)) return { ok: false, reason: "bad_secret" };
+    const reserved = await ctx.runMutation(internal.billing.reserveTestPayment, { deviceId, commissionId });
+    if (!reserved.ok) return reserved;
+    const paid = await payWithTestCard(planId(reserved.plan), { kind: "commission", deviceId, commissionId: reserved.commissionId });
+    await ctx.runMutation(internal.billing.recordTestPayment, { commissionId: reserved.commissionId, ...(paid.ok ? { paymentId: paid.id } : { error: paid.error }) });
+    if (!paid.ok) {
+      console.error(`test payment failed: ${paid.error}`);
+      return { ok: false, reason: "declined", message: paid.error };
+    }
+    return { ok: true, paymentId: paid.id };
+  },
+});
+
+export const reserveTestPlus = internalMutation({
+  args: { deviceId: v.string() },
+  returns: v.union(v.literal("ok"), v.literal("already_plus"), v.literal("limit")),
+  handler: async (ctx, { deviceId }) => {
+    if (await plusEntitlement(ctx, deviceId)) return "already_plus" as const;
+    return (await takeTestPayment(ctx, deviceId, true)) ? ("ok" as const) : ("limit" as const);
+  },
+});
+
+export const scheduleTestWatchdog = internalMutation({
+  args: { paymentId: v.string(), deviceId: v.string() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    await ctx.scheduler.runAfter(WATCHDOG_MS, internal.billing.testPaymentWatchdog, args);
+    return null;
+  },
+});
+
+export const payTestPlus = action({
+  args: { deviceId: v.string(), secret: v.string() },
+  returns: payTestResult,
+  handler: async (ctx, { deviceId, secret }): Promise<PayTestResult> => {
+    checkDeviceId(deviceId);
+    if (!testCardConfig().ok) return { ok: false, reason: "unavailable" };
+    if (!demoSecretOk(secret)) return { ok: false, reason: "bad_secret" };
+    const reserved = await ctx.runMutation(internal.billing.reserveTestPlus, { deviceId });
+    if (reserved === "already_plus") return { ok: false, reason: "already_plus" };
+    if (reserved === "limit") return { ok: false, reason: "limit" };
+    const paid = await payWithTestCard(planId("plus"), { kind: "plus", deviceId });
+    if (!paid.ok) {
+      console.error(`test Plus payment failed: ${paid.error}`);
+      return { ok: false, reason: "declined", message: paid.error };
+    }
+    await ctx.runMutation(internal.billing.scheduleTestWatchdog, { paymentId: paid.id, deviceId });
+    return { ok: true, paymentId: paid.id };
+  },
+});
+
+export const testPaymentSettled = internalQuery({
+  args: { deviceId: v.string(), commissionId: v.optional(v.id("commissions")) },
+  returns: v.boolean(),
+  handler: async (ctx, { deviceId, commissionId }) => {
+    if (!commissionId) return !!(await plusEntitlement(ctx, deviceId));
+    const row = await ctx.db.get(commissionId);
+    return !row || row.status !== "awaiting_payment" || !!row.error;
+  },
+});
+
+export const testPaymentWatchdog = internalAction({
+  args: { paymentId: v.string(), deviceId: v.string(), commissionId: v.optional(v.id("commissions")) },
+  returns: v.null(),
+  handler: async (ctx, { paymentId, deviceId, commissionId }): Promise<null> => {
+    if (await ctx.runQuery(internal.billing.testPaymentSettled, { deviceId, commissionId })) return null;
+    const res = await whop("GET", `/payments/${encodeURIComponent(paymentId)}`);
+    if (!res.ok) {
+      console.error(`watchdog could not read ${paymentId}: ${res.error}`);
+      return null;
+    }
+    const outcome = paymentOutcome(res.data);
+    if (outcome === "pending") {
+      console.warn(`watchdog: ${paymentId} still pending`);
+      return null;
+    }
+    const metadata = { ...(commissionId ? { kind: "commission", commissionId } : { kind: "plus" }), deviceId, ...stringRecord(res.data.metadata) };
+    await ctx.runMutation(internal.billing.receiveWebhook, {
+      eventId: `watchdog:${paymentId}`,
+      type: outcome === "succeeded" ? "payment.succeeded" : "payment.failed",
+      dataJson: JSON.stringify({ ...res.data, metadata }),
+    });
+    return null;
+  },
+});
+
 // ---------- webhook ----------
 
 export const receiveWebhook = internalMutation({
@@ -375,7 +540,7 @@ export const handleEvent = internalAction({
                 variantId,
                 checkoutId: str(d.checkout_configuration_id),
               })
-            : await ctx.runMutation(internal.commissions.notePaymentFailed, { commissionId: meta.commissionId ?? "" });
+            : await ctx.runMutation(internal.commissions.notePaymentFailed, { commissionId: meta.commissionId ?? "", reason: failureMessage(d) });
       } else if ((kind === "plus" || kind === "paper") && membershipId) {
         if (type === "payment.failed") {
           note = await ctx.runMutation(internal.billing.endMembership, { membershipId, status: "payment_failed" });

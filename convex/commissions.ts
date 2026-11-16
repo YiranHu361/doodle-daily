@@ -231,6 +231,7 @@ const mineItem = v.object({
   topic: v.string(),
   status: commissionStatus,
   comicId: v.union(v.id("comics"), v.null()),
+  paymentError: v.union(v.string(), v.null()),
   createdAt: v.number(),
 });
 
@@ -252,7 +253,8 @@ export const mine = query({
         if (comic?.status === "ready" && comic.hidden !== true) status = "ready";
         else if (!comic || comic.status === "failed") status = "failed";
       }
-      out.push({ _id: r._id, topic: r.topic, status, comicId: status === "ready" ? (r.comicId ?? null) : null, createdAt: r.createdAt });
+      const paymentError = status === "awaiting_payment" && r.error ? r.error : null;
+      out.push({ _id: r._id, topic: r.topic, status, comicId: status === "ready" ? (r.comicId ?? null) : null, paymentError, createdAt: r.createdAt });
     }
     return out;
   },
@@ -277,13 +279,13 @@ export const markPaid = internalMutation({
 });
 
 export const notePaymentFailed = internalMutation({
-  args: { commissionId: v.string() },
+  args: { commissionId: v.string(), reason: v.optional(v.string()) },
   returns: v.string(),
-  handler: async (ctx, { commissionId }) => {
+  handler: async (ctx, { commissionId, reason }) => {
     const id = ctx.db.normalizeId("commissions", commissionId);
     const row = id ? await ctx.db.get(id) : null;
     if (!row || row.status !== "awaiting_payment") return "ignored";
-    await ctx.db.patch(row._id, { error: "payment failed", updatedAt: Date.now() });
+    await ctx.db.patch(row._id, { error: cut(reason ? `payment failed: ${reason}` : "payment failed", 300), updatedAt: Date.now() });
     return "commission payment failed";
   },
 });

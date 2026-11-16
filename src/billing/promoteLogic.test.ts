@@ -42,7 +42,7 @@ describe("steps", () => {
     expect(s.step).toBe("chat");
     s = run([{ type: "send", text: "My newsletter" }, { type: "brief", brief }, { type: "toLink" }], s);
     expect(s.step).toBe("link");
-    s = run([{ type: "link", link: "https://inkwell.app" }, { type: "checked", check: { readable: true, site: "inkwell.app", claims: [] } }, { type: "started", commissionId: "c1" }], s);
+    s = run([{ type: "link", link: "https://inkwell.app" }, { type: "checked", check: { readable: true, site: "inkwell.app", claims: [] } }, { type: "started", commissionId: "c1", checkoutUrl: "https://whop.com/c1" }], s);
     expect(s.step).toBe("status");
     expect(s.commissionId).toBe("c1");
     s = promoReducer(s, { type: "ready", comicId: "k1" });

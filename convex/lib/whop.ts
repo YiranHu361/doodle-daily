@@ -82,3 +82,44 @@ export function isValidMembership(status: string, periodEnd: number | undefined,
   if (status !== "active" && status !== "trialing") return false;
   return periodEnd === undefined || periodEnd > now;
 }
+
+export type TestCard = { ok: true; companyId: string; memberId: string; paymentMethodId: string } | { ok: false };
+
+export function testCardConfig(): TestCard {
+  const config = whopConfig();
+  const memberId = process.env.WHOP_TEST_MEMBER_ID ?? "";
+  const paymentMethodId = process.env.WHOP_TEST_PAYMENT_METHOD_ID ?? "";
+  if (!config.ok || !config.companyId || !memberId || !paymentMethodId) return { ok: false };
+  return { ok: true, companyId: config.companyId, memberId, paymentMethodId };
+}
+
+export async function payWithTestCard(variantId: string, metadata: Record<string, string>): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const card = testCardConfig();
+  if (!card.ok) return { ok: false, error: "test card not configured" };
+  if (!variantId) return { ok: false, error: "plan not configured" };
+  const res = await whop("POST", "/payments", {
+    account_id: card.companyId,
+    member_id: card.memberId,
+    payment_method_id: card.paymentMethodId,
+    off_session: true,
+    line_items: [{ variant_id: variantId, quantity: 1 }],
+    metadata,
+  });
+  if (!res.ok) return { ok: false, error: res.error };
+  const id = res.data.id;
+  if (typeof id !== "string" || !id.startsWith("pay_")) return { ok: false, error: "payment without an id" };
+  if (paymentOutcome(res.data) === "failed") return { ok: false, error: failureMessage(res.data) };
+  return { ok: true, id };
+}
+
+export function paymentOutcome(data: Record<string, unknown>): "succeeded" | "failed" | "pending" {
+  if (data.status === "paid" || data.substatus === "succeeded") return "succeeded";
+  if (data.substatus === "failed" || data.status === "uncollectible" || data.status === "void") return "failed";
+  return "pending";
+}
+
+export function failureMessage(data: Record<string, unknown>): string {
+  const message = typeof data.failure_message === "string" && data.failure_message.trim() ? data.failure_message : "the card was declined";
+  return message.replace(/\s+/g, " ").trim().slice(0, 160);
+}
+

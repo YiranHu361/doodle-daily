@@ -9,8 +9,9 @@ import { useToday } from "../../data/hooks";
 import { ShareHost, useShare } from "../../share/useShare";
 import { colors, cut, sectionColor, type } from "../../theme";
 import { copy } from "../../theme/copy";
-import { openCheckout } from "../hooks";
-import type { CommissionStatus } from "../logic";
+import { openCheckout, usePlus } from "../hooks";
+import { paymentErrorLine, type CommissionStatus } from "../logic";
+import { PayButtons, useTestPay } from "../PayButtons";
 import {
   canCheck,
   canPay,
@@ -24,6 +25,7 @@ import {
   MESSAGE_MAX,
   openingLine,
   payLabel,
+  PROMO_PRICE,
   promoStatusLine,
   questionLine,
   replyMessages,
@@ -200,6 +202,8 @@ export function ChatStep({ state, dispatch, deviceId }: StepProps) {
 export function LinkStep({ state, dispatch, deviceId }: StepProps) {
   const check = useAction(api.promote.check);
   const start = useAction(api.promote.start);
+  const testPay = useTestPay(deviceId);
+  const { testCard } = usePlus();
   const brief = state.brief;
   if (!brief || !state.section || !state.persona) return null;
   const section = state.section;
@@ -216,7 +220,7 @@ export function LinkStep({ state, dispatch, deviceId }: StepProps) {
     }
   };
 
-  const pay = async () => {
+  const pay = async (how: "test" | "checkout") => {
     if (!canPay(state)) return;
     dispatch({ type: "pending", pending: "start" });
     try {
@@ -224,8 +228,10 @@ export function LinkStep({ state, dispatch, deviceId }: StepProps) {
         await start({ deviceId, persona, section, brief, link: state.link.trim(), ...(state.unchecked ? { unchecked: true } : {}) }),
       );
       if (out.kind === "error") return dispatch({ type: "error", message: out.message });
-      dispatch({ type: "started", commissionId: out.commissionId });
-      await openCheckout(out.url);
+      dispatch({ type: "started", commissionId: out.commissionId, checkoutUrl: out.url });
+      if (how === "checkout") return await openCheckout(out.url);
+      const failed = await testPay(out.commissionId);
+      if (failed) dispatch({ type: "error", message: failed });
     } catch {
       dispatch({ type: "error", message: "Checkout isn't available right now. Try again in a minute." });
     }
@@ -291,16 +297,28 @@ export function LinkStep({ state, dispatch, deviceId }: StepProps) {
         </CutBox>
       )}
       {canPay(state) || state.pending === "start" ? (
-        <PrimaryButton testID="promoPay" label={payLabel(section, state.pending === "start")} onPress={() => void pay()} disabled={!canPay(state)} />
+        <PayButtons
+          testID="promoPay"
+          testCard={testCard}
+          price={PROMO_PRICE}
+          checkoutLabel={payLabel(section)}
+          busy={state.pending === "start"}
+          disabled={!canPay(state)}
+          error={state.error}
+          onTestPay={() => void pay("test")}
+          onCheckout={() => void pay("checkout")}
+        />
+      ) : state.error ? (
+        <Text style={styles.error}>{state.error}</Text>
       ) : null}
-      {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
-      {result ? <Text style={styles.fine}>Test mode: Whop sandbox, no real money. Card 4242 4242 4242 4242.</Text> : null}
     </>
   );
 }
 
 export function StatusStep({ state, dispatch, deviceId }: StepProps) {
   const mine = useQuery(api.commissions.mine, state.commissionId ? { deviceId } : "skip");
+  const testPay = useTestPay(deviceId);
+  const { testCard } = usePlus();
   const item = mine?.find((c) => c._id === state.commissionId);
   const status = (item?.status ?? "awaiting_payment") as CommissionStatus;
   const comicId = (item as { comicId?: string } | undefined)?.comicId ?? null;
@@ -309,16 +327,41 @@ export function StatusStep({ state, dispatch, deviceId }: StepProps) {
   }, [status, comicId, dispatch]);
   if (!state.section) return null;
   const failed = status === "failed" || status === "refunded";
+  const awaiting = status === "awaiting_payment";
+  const paying = state.pending === "start";
+  const payError = awaiting && !paying ? (state.error ?? paymentErrorLine(item?.paymentError)) : null;
+  const retry = async (how: "test" | "checkout") => {
+    if (!state.commissionId || paying) return;
+    if (how === "checkout") {
+      if (state.checkoutUrl) await openCheckout(state.checkoutUrl);
+      return;
+    }
+    dispatch({ type: "pending", pending: "start" });
+    const failedLine = await testPay(state.commissionId);
+    dispatch(failedLine ? { type: "error", message: failedLine } : { type: "pending", pending: null });
+  };
   return (
     <View style={styles.statusBox}>
-      <CutBox cut={cut.card} fill={colors.surface[2]} stroke={failed ? colors.state.error : colors.neon.volt} style={styles.status}>
+      <CutBox cut={cut.card} fill={colors.surface[2]} stroke={failed || payError ? colors.state.error : colors.neon.volt} style={styles.status}>
         <View style={styles.statusRow}>
-          {failed ? null : <PulsingDots color={colors.neon.volt} />}
-          <Text testID="promoStatus" style={[styles.body, styles.flex]} accessibilityLiveRegion="polite">
-            {promoStatusLine(status, state.section)}
+          {failed || payError ? null : <PulsingDots color={colors.neon.volt} />}
+          <Text testID="promoStatus" style={[styles.body, styles.flex]} accessibilityLiveRegion="polite" numberOfLines={payError ? 2 : undefined}>
+            {payError ?? (awaiting && testCard ? "Paying through Whop sandbox" : promoStatusLine(status, state.section))}
           </Text>
         </View>
       </CutBox>
+      {payError ? (
+        <PayButtons
+          testID="promoPay"
+          testCard={testCard}
+          price={PROMO_PRICE}
+          checkoutLabel={payLabel(state.section)}
+          busy={false}
+          error={null}
+          onTestPay={() => void retry("test")}
+          onCheckout={() => void retry("checkout")}
+        />
+      ) : null}
       {failed ? <PrimaryButton label="Try again" onPress={() => dispatch({ type: "reset" })} /> : null}
       {status === "awaiting_payment" ? <QuietLink testID="promoStartOver" label="Start over" onPress={() => dispatch({ type: "reset" })} /> : null}
     </View>
