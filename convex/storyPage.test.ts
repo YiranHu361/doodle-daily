@@ -82,7 +82,7 @@ describe("GET /s/<comicId>", () => {
     const promo = await get(t, `/s/${sponsored}`);
     expect(promo.status).toBe(200);
     expect(promo.body).toContain("SPONSORED");
-    expect(promo.body).toContain("Sponsored by Acme &lt;Notes&gt;");
+    expect(promo.body).toContain("SPONSORED · by Acme &lt;Notes&gt;");
     expect(promo.body).toContain(">Try the beta</a>");
     const replaced = await insertComic(t, { replacedAt: Date.now() });
     const page = await get(t, `/s/${replaced}`);

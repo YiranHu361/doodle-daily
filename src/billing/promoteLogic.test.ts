@@ -2,17 +2,14 @@ import { describe, expect, test } from "vitest";
 import {
   audioContentType,
   briefAsText,
-  canCheck,
   canGoBack,
   canPay,
   canSend,
   clipTimer,
-  decodeCheck,
   decodeReply,
   decodeStart,
   decodeTranscript,
   doneLine,
-  droppedClaims,
   initialPromoState,
   micLevel,
   payLabel,
@@ -42,7 +39,7 @@ describe("steps", () => {
     expect(s.step).toBe("chat");
     s = run([{ type: "send", text: "My newsletter" }, { type: "brief", brief }, { type: "toLink" }], s);
     expect(s.step).toBe("link");
-    s = run([{ type: "link", link: "https://inkwell.app" }, { type: "checked", check: { readable: true, site: "inkwell.app", claims: [] } }, { type: "started", commissionId: "c1" }], s);
+    s = run([{ type: "link", link: "https://inkwell.app" }, { type: "started", commissionId: "c1", checkoutUrl: "https://whop.com/c1" }], s);
     expect(s.step).toBe("status");
     expect(s.commissionId).toBe("c1");
     s = promoReducer(s, { type: "ready", comicId: "k1" });
@@ -137,38 +134,17 @@ describe("chat", () => {
 describe("link and pay", () => {
   const atLink = () => run([{ type: "send", text: "a" }, { type: "brief", brief }, { type: "toLink" }], atChat());
 
-  test("check needs a real link", () => {
-    expect(canCheck(atLink())).toBe(false);
-    expect(canCheck(promoReducer(atLink(), { type: "link", link: "inkwell" }))).toBe(false);
-    expect(canCheck(promoReducer(atLink(), { type: "link", link: "https://inkwell.app/pricing" }))).toBe(true);
-  });
-
-  test("a readable page allows paying and counts crossed claims", () => {
-    const s = run([{ type: "link", link: "https://inkwell.app" }, { type: "checked", check: { readable: true, site: "inkwell.app", claims: [{ text: "Free for 30 days", backed: true }, { text: "Used by 2,000 writers", backed: false }] } }], atLink());
+  test("a well-formed link is all it takes to pay; no page check", () => {
+    expect(canPay(atLink())).toBe(false);
+    expect(canPay(promoReducer(atLink(), { type: "link", link: "inkwell" }))).toBe(false);
+    const s = promoReducer(atLink(), { type: "link", link: "https://inkwell.app/pricing" });
     expect(canPay(s)).toBe(true);
-    expect(canCheck(s)).toBe(false);
-    expect(droppedClaims(s.check)).toBe(1);
+    expect(canPay({ ...s, pending: "start" })).toBe(false);
   });
 
-  test("an unreadable page needs another link or an explicit continue", () => {
-    const s = run([{ type: "link", link: "https://inkwell.app" }, { type: "checked", check: { readable: false, site: "inkwell.app", claims: [] } }], atLink());
-    expect(canPay(s)).toBe(false);
-    const go = promoReducer(s, { type: "continueUnchecked" });
-    expect(go.unchecked).toBe(true);
-    expect(canPay(go)).toBe(true);
-    const other = promoReducer(go, { type: "tryAnotherLink" });
-    expect(other).toMatchObject({ link: "", check: null, unchecked: false });
-    expect(canPay(other)).toBe(false);
-  });
-
-  test("continue unchecked does nothing for a readable page", () => {
-    const s = run([{ type: "link", link: "https://inkwell.app" }, { type: "checked", check: { readable: true, site: "x", claims: [] } }], atLink());
-    expect(promoReducer(s, { type: "continueUnchecked" }).unchecked).toBe(false);
-  });
-
-  test("editing the link drops the old check", () => {
-    const s = run([{ type: "link", link: "https://inkwell.app" }, { type: "checked", check: { readable: false, site: "", claims: [] } }, { type: "continueUnchecked" }, { type: "link", link: "https://inkwell.app/x" }], atLink());
-    expect(s).toMatchObject({ check: null, unchecked: false });
+  test("started keeps the checkout link for the hosted fallback", () => {
+    const s = run([{ type: "link", link: "https://inkwell.app" }, { type: "started", commissionId: "c1", checkoutUrl: "https://whop.com/c1" }], atLink());
+    expect(s).toMatchObject({ step: "status", commissionId: "c1", checkoutUrl: "https://whop.com/c1" });
   });
 
   test("labels name the section and the $5 price", () => {
@@ -189,14 +165,6 @@ describe("decoders", () => {
     expect(decodeReply({ kind: "error", reason: "limit", message: "Come back tomorrow." })).toEqual({ kind: "error", message: "Come back tomorrow." });
     expect(decodeReply({ kind: "error", reason: "limit" })).toEqual({ kind: "error", message: "That's enough for today. Try again tomorrow." });
     expect(decodeReply(null)).toMatchObject({ kind: "error" });
-  });
-
-  test("check", () => {
-    expect(decodeCheck({ kind: "checked", readable: true, site: "a.com", claims: [{ text: "x", backed: true }, { text: "y" }, { backed: true }, 4] })).toEqual({
-      kind: "checked",
-      check: { readable: true, site: "a.com", claims: [{ text: "x", backed: true }, { text: "y", backed: false }] },
-    });
-    expect(decodeCheck({ kind: "checked", site: "a.com" })).toMatchObject({ kind: "error" });
   });
 
   test("transcript and start", () => {

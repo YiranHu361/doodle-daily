@@ -2,11 +2,12 @@ import { useAction } from "convex/react";
 import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { api } from "../../convex/_generated/api";
-import { PrimaryButton, PulsingDots } from "../components/ui";
+import { PulsingDots } from "../components/ui";
 import { Robo } from "../robo/Robo";
 import { colors, type } from "../theme";
 import { openCheckout, useBillingDevice, usePlus } from "./hooks";
-import { formatPlusDate, startFailMessage } from "./logic";
+import { formatPlusDate, startFailMessage, testPayMessage } from "./logic";
+import { PayButtons } from "./PayButtons";
 import { BillingSheet, CrownIcon, QuietLink, SheetHeader } from "./Sheet";
 
 const PERKS = ["Every back issue, not just today and yesterday", "Unlimited Draw a fresh one", "A weekly combo freeze: one missed day forgiven"];
@@ -26,7 +27,8 @@ export function PaywallSheet({ visible, onClose, onOwnPaper }: { visible: boolea
   const deviceId = useBillingDevice();
   const status = usePlus();
   const start = useAction(api.billing.startPlusCheckout);
-  const [phase, setPhase] = useState<"idle" | "starting" | "waiting">("idle");
+  const payTestPlus = useAction(api.billing.payTestPlus);
+  const [phase, setPhase] = useState<"idle" | "starting" | "paying" | "waiting">("idle");
   const [error, setError] = useState<string | null>(null);
 
   const getPlus = async () => {
@@ -45,6 +47,22 @@ export function PaywallSheet({ visible, onClose, onOwnPaper }: { visible: boolea
     } catch {
       setPhase("idle");
       setError(startFailMessage("error"));
+    }
+  };
+
+  const testPlus = async () => {
+    if (!deviceId || phase === "starting" || phase === "paying") return;
+    setError(null);
+    setPhase("paying");
+    try {
+      const res = await payTestPlus({ deviceId, secret: process.env.EXPO_PUBLIC_DEMO_SECRET ?? "" });
+      if (!res.ok) {
+        setPhase("idle");
+        setError(testPayMessage(res.reason, res.message));
+      }
+    } catch {
+      setPhase("idle");
+      setError(testPayMessage("error"));
     }
   };
 
@@ -82,16 +100,28 @@ export function PaywallSheet({ visible, onClose, onOwnPaper }: { visible: boolea
       ))}
       <Text style={styles.combo}>Plus members earn a free day every 7-day combo.</Text>
       <Text style={styles.price}>$3 a month</Text>
-      {phase === "waiting" ? (
-        <View testID="plusWaiting" style={styles.waiting}>
-          <PulsingDots color={colors.neon.volt} />
-          <Text style={styles.note}>Waiting for Whop to confirm your payment. This sheet updates by itself.</Text>
-        </View>
+      {phase === "waiting" || phase === "paying" ? (
+        <>
+          <View testID="plusWaiting" style={styles.waiting}>
+            <PulsingDots color={colors.neon.volt} />
+            <Text style={styles.note}>{phase === "paying" ? "Paying through Whop sandbox" : "Waiting for Whop to confirm your payment. This sheet updates by itself."}</Text>
+          </View>
+          {phase === "paying" ? <QuietLink testID="plusButtonCheckout" label="Open Whop checkout instead" onPress={() => void getPlus()} /> : null}
+        </>
       ) : (
-        <PrimaryButton testID="plusButton" label={phase === "starting" ? "Opening checkout" : "Get Plus"} onPress={() => void getPlus()} disabled={phase === "starting" || !deviceId} />
+        <PayButtons
+          testID="plusButton"
+          testCard={status.testCard}
+          price="$3"
+          checkoutLabel="Get Plus"
+          busy={phase === "starting"}
+          disabled={!deviceId}
+          error={error}
+          checkoutFinePrint="Test mode: Whop sandbox, no real money."
+          onTestPay={() => void testPlus()}
+          onCheckout={() => void getPlus()}
+        />
       )}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Text style={styles.fine}>Test mode: Whop sandbox, no real money.</Text>
       {onOwnPaper ? <QuietLink testID="ownPaperLink" label="Start your own paper" onPress={onOwnPaper} /> : null}
     </BillingSheet>
   );
@@ -106,6 +136,4 @@ const styles = StyleSheet.create({
   waiting: { flexDirection: "row", gap: 10, alignItems: "center" },
   note: { ...type.body, fontSize: 15, color: colors.text.mid, flex: 1 },
   earned: { ...type.button, color: colors.neon.volt, marginTop: 6 },
-  error: { ...type.body, fontSize: 15, color: colors.state.error },
-  fine: { ...type.meta, color: colors.text.low, textAlign: "center" },
 });

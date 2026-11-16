@@ -223,6 +223,7 @@ export default defineSchema({
     unverified: v.optional(v.boolean()),
     promo: v.optional(promo),
     error: v.optional(v.string()),
+    testPayAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -246,6 +247,13 @@ export default defineSchema({
     createdAt: v.number(),
     updatedAt: v.number(),
   }).index("by_sender_date", ["sender", "date"]),
+
+  testPayments: defineTable({
+    deviceId: v.string(),
+    date: v.string(),
+    count: v.number(),
+    plusAt: v.optional(v.number()),
+  }).index("by_device_date", ["deviceId", "date"]),
 
   webhookEvents: defineTable({
     eventId: v.string(),

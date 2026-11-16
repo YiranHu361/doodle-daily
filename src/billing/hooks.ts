@@ -11,6 +11,7 @@ export type PlusState = {
   freeDrawsLeftToday: number;
   freezesLeftThisWeek: number;
   freeDaysEarned: number;
+  testCard: boolean;
 };
 
 export function useBillingDevice(): string | null {
@@ -29,6 +30,7 @@ export function usePlus(): PlusState {
     freeDrawsLeftToday: raw ? (raw.freeDrawsLeftToday ?? Infinity) : 1,
     freezesLeftThisWeek: raw?.freezesLeftThisWeek ?? 0,
     freeDaysEarned: raw?.freeDaysEarned ?? 0,
+    testCard: raw?.testCard ?? false,
   };
 }
 

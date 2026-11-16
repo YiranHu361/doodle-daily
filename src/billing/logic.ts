@@ -46,6 +46,34 @@ export function startFailMessage(reason: StartFailure): string {
   }
 }
 
+export type TestPayFailure = "unavailable" | "bad_secret" | "not_found" | "already_paying" | "already_plus" | "limit" | "declined" | "error";
+
+export function testPayMessage(reason: TestPayFailure, message?: string): string {
+  switch (reason) {
+    case "declined":
+      return `Payment didn't go through: ${message?.replace(/[.\s]+$/, "") || "the card was declined"}.`;
+    case "limit":
+      return "That's 10 test payments today. Use Whop checkout instead.";
+    case "already_paying":
+      return "Robo is already taking that payment.";
+    case "already_plus":
+      return "You're already on Plus.";
+    case "not_found":
+      return "Robo lost that order. Start over.";
+    case "unavailable":
+    case "bad_secret":
+      return "The test card isn't set up here. Use Whop checkout instead.";
+    case "error":
+      return "Whop didn't answer. Try again in a minute.";
+  }
+}
+
+export function paymentErrorLine(error: string | null | undefined): string | null {
+  if (!error) return null;
+  const reason = error.replace(/^payment failed:?\s*/i, "").trim();
+  return testPayMessage("declined", reason || undefined);
+}
+
 export type Refusal = "needs_source" | "private_life" | "tragedy" | "private_person" | "unreadable_link";
 
 export function refusalMessage(refusal: Refusal | undefined): string | null {

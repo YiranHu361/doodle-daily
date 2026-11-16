@@ -34,6 +34,9 @@ type Call = { method: string; url: string; body: unknown };
 let calls: Call[] = [];
 let periodEnd = Date.UTC(2026, 11, 15);
 let membershipStatus = "active";
+let payState: Record<string, unknown> = { status: "paid", substatus: "succeeded" };
+let payReply: Record<string, unknown> = { status: "open", substatus: "incomplete" };
+const payMeta: Record<string, unknown> = {};
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -59,6 +62,13 @@ function fakeWhop(input: RequestInfo | URL, init?: RequestInit): Promise<Respons
       json({ id: mem[1], status: membershipStatus, variant_id: PLUS_PLAN, current_period_end: new Date(periodEnd).toISOString(), metadata: { kind: "plus", deviceId: DEVICE } }),
     );
   }
+  if (url.endsWith("/api/v1/payments") && method === "POST") {
+    const id = `pay_t${calls.length}`;
+    payMeta[id] = { metadata: body.metadata, variant_id: body.line_items[0].variant_id };
+    return Promise.resolve(json({ id, ...payReply }));
+  }
+  const payment = /\/payments\/(pay_\w+)$/.exec(url);
+  if (payment) return Promise.resolve(json({ id: payment[1], membership_id: "mem_tp", ...(payMeta[payment[1]] as object), ...payState }));
   const article = ARTICLES[url];
   if (article) return Promise.resolve(new Response(article, { status: 200, headers: { "Content-Type": "text/html" } }));
   const refund = /\/payments\/(pay_\w+)\/refund$/.exec(url);
@@ -72,6 +82,11 @@ beforeEach(() => {
   calls = [];
   periodEnd = Date.UTC(2026, 11, 15);
   membershipStatus = "active";
+  payState = { status: "paid", substatus: "succeeded" };
+  payReply = { status: "open", substatus: "incomplete" };
+  process.env.WHOP_COMPANY_ID = "biz_test";
+  process.env.WHOP_TEST_MEMBER_ID = "mber_test";
+  process.env.WHOP_TEST_PAYMENT_METHOD_ID = "payt_test";
   vi.stubGlobal("fetch", vi.fn(fakeWhop));
   process.env.MOCK_IMAGE_DELAY_MS = "0";
   process.env.DEMO_SECRET = "demo";
@@ -471,6 +486,105 @@ describe("locked archive", () => {
     const issue = (await t.query(api.editions.byDate, { date: old, deviceId: DEVICE }))!;
     expect(issue.locked).toBeUndefined();
     expect(issue.comics).toHaveLength(1);
+  });
+});
+
+describe("sandbox test card", () => {
+  async function commission(t: T, deviceId = DEVICE) {
+    const res = await t.action(api.commissions.start, { deviceId, topic: "a robot learns to fold laundry" });
+    if (!res.ok) throw new Error("start failed");
+    return res.commissionId;
+  }
+  const payments = () => calls.filter((c) => c.method === "POST" && c.url.endsWith("/api/v1/payments"));
+
+  test("refused outside the sandbox, without the test variables or with a wrong secret; nothing is charged", async () => {
+    const t = convexTest(schema, modules);
+    const commissionId = await commission(t);
+    expect(await t.query(api.billing.status, { deviceId: DEVICE })).toMatchObject({ testCard: true });
+    expect(await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "wrong", commissionId })).toEqual({ ok: false, reason: "bad_secret" });
+    delete process.env.WHOP_TEST_PAYMENT_METHOD_ID;
+    expect(await t.query(api.billing.status, { deviceId: DEVICE })).toMatchObject({ testCard: false });
+    expect(await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId })).toEqual({ ok: false, reason: "unavailable" });
+    process.env.WHOP_TEST_PAYMENT_METHOD_ID = "payt_test";
+    process.env.WHOP_ENVIRONMENT = "production";
+    expect(await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId })).toEqual({ ok: false, reason: "unavailable" });
+    expect(await t.action(api.billing.payTestPlus, { deviceId: DEVICE, secret: "demo" })).toEqual({ ok: false, reason: "unavailable" });
+    expect(payments()).toHaveLength(0);
+  });
+
+  test("pays the commission once with the saved card; the webhook draws it", async () => {
+    const t = convexTest(schema, modules);
+    const commissionId = await commission(t);
+    expect(await t.action(api.billing.payTest, { deviceId: OTHER, secret: "demo", commissionId })).toEqual({ ok: false, reason: "not_found" });
+    const res = await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId });
+    expect(res).toMatchObject({ ok: true, paymentId: expect.stringMatching(/^pay_/) });
+    expect(payments()[0].body).toEqual({
+      account_id: "biz_test",
+      member_id: "mber_test",
+      payment_method_id: "payt_test",
+      off_session: true,
+      line_items: [{ variant_id: COMMISSION_PLAN, quantity: 1 }],
+      metadata: { kind: "commission", deviceId: DEVICE, commissionId },
+    });
+    expect(await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId })).toEqual({ ok: false, reason: "already_paying" });
+    expect(payments()).toHaveLength(1);
+    if (!res.ok) throw new Error("pay failed");
+    await deliver(t, { type: "payment.succeeded", data: { id: res.paymentId, variant_id: COMMISSION_PLAN, metadata: { kind: "commission", deviceId: DEVICE, commissionId } } });
+    await settle(t, 90_000);
+    expect((await t.query(api.commissions.mine, { deviceId: DEVICE }))[0].status).toBe("ready");
+    expect(calls.filter((c) => c.method === "GET" && c.url.includes("/payments/"))).toHaveLength(0);
+  });
+
+  test("without a webhook, the watchdog reads the payment once after 60 s and applies it", async () => {
+    const t = convexTest(schema, modules);
+    const commissionId = await commission(t);
+    await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId });
+    await settle(t, 50_000);
+    expect((await t.query(api.commissions.mine, { deviceId: DEVICE }))[0].status).toBe("awaiting_payment");
+    await settle(t, 40_000);
+    expect(calls.filter((c) => c.method === "GET" && c.url.includes("/payments/"))).toHaveLength(1);
+    expect((await t.query(api.commissions.mine, { deviceId: DEVICE }))[0].status).toBe("ready");
+  });
+
+  test("a declined card shows the reason and can be tried again", async () => {
+    const t = convexTest(schema, modules);
+    const commissionId = await commission(t);
+    payReply = { status: "open", substatus: "failed", failure_message: "Your card was declined." };
+    expect(await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId })).toEqual({ ok: false, reason: "declined", message: "Your card was declined." });
+    expect((await t.query(api.commissions.mine, { deviceId: DEVICE }))[0]).toMatchObject({ status: "awaiting_payment", paymentError: "payment failed: Your card was declined." });
+    payReply = { status: "open", substatus: "incomplete" };
+    expect(await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId })).toMatchObject({ ok: true });
+    expect((await t.query(api.commissions.mine, { deviceId: DEVICE }))[0].paymentError).toBeNull();
+  });
+
+  test("a failed payment webhook records Whop's reason", async () => {
+    const t = convexTest(schema, modules);
+    const commissionId = await commission(t);
+    const res = await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId });
+    if (!res.ok) throw new Error("pay failed");
+    await deliver(t, { type: "payment.failed", data: { id: res.paymentId, failure_message: "Insufficient funds", metadata: { kind: "commission", deviceId: DEVICE, commissionId } } });
+    await settle(t, 2000);
+    expect((await t.query(api.commissions.mine, { deviceId: DEVICE }))[0].paymentError).toBe("payment failed: Insufficient funds");
+  });
+
+  test("at most 10 test payments per device per day", async () => {
+    const t = convexTest(schema, modules);
+    payReply = { status: "open", substatus: "failed" };
+    const commissionId = await commission(t);
+    for (let i = 0; i < 10; i++) expect(await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId })).toMatchObject({ reason: "declined" });
+    expect(await t.action(api.billing.payTest, { deviceId: DEVICE, secret: "demo", commissionId })).toEqual({ ok: false, reason: "limit" });
+    expect(payments()).toHaveLength(10);
+  });
+
+  test("Plus is paid on the Plus plan once; the watchdog grants it if no webhook comes", async () => {
+    const t = convexTest(schema, modules);
+    const res = await t.action(api.billing.payTestPlus, { deviceId: DEVICE, secret: "demo" });
+    expect(res).toMatchObject({ ok: true });
+    expect(payments()[0].body).toMatchObject({ line_items: [{ variant_id: PLUS_PLAN, quantity: 1 }], metadata: { kind: "plus", deviceId: DEVICE } });
+    expect(await t.action(api.billing.payTestPlus, { deviceId: DEVICE, secret: "demo" })).toEqual({ ok: false, reason: "limit" });
+    await settle(t, 70_000);
+    expect((await t.query(api.billing.status, { deviceId: DEVICE })).plus).toBe(true);
+    expect(await t.action(api.billing.payTestPlus, { deviceId: DEVICE, secret: "demo" })).toEqual({ ok: false, reason: "already_plus" });
   });
 });
 
