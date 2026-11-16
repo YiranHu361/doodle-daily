@@ -13,7 +13,7 @@ export const DOCK_HEIGHT = 96;
 
 export type DockHandle = { shake: () => void };
 
-export const Dock = forwardRef<DockHandle, { busy: boolean; onDraw: () => void }>(function Dock({ busy, onDraw }, ref) {
+export const Dock = forwardRef<DockHandle, { busy: boolean; onDraw: () => void; onPromoted: () => void }>(function Dock({ busy, onDraw, onPromoted }, ref) {
   const insets = useSafeAreaInsets();
   const reduce = useReducedMotion();
   const x = useSharedValue(0);
@@ -56,7 +56,7 @@ export const Dock = forwardRef<DockHandle, { busy: boolean; onDraw: () => void }
             {busy ? <PulsingDots /> : null}
           </PrimaryButton>
         </Animated.View>
-        <CommissionButton />
+        <CommissionButton onPromoted={onPromoted} />
       </View>
     </View>
   );

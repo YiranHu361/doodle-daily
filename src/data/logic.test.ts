@@ -36,6 +36,11 @@ describe("chips", () => {
     const list = [comic("a", "tech"), comic("n", "tech", { isNew: true, createdAt: 5 }), comic("f", "tech", { createdAt: 9 })];
     expect(orderForToday(list, "f").map((c) => c._id)).toEqual(["f", "n", "a"]);
   });
+  test("a sponsored comic keeps the top slot ahead of new and drawing comics", () => {
+    const list = [comic("s", "memes", { sponsored: true }), comic("a", "tech"), comic("n", "memes", { isNew: true, createdAt: 5 }), comic("f", "tech", { createdAt: 9 })];
+    expect(orderForToday(list, "f").map((c) => c._id)).toEqual(["s", "f", "n", "a"]);
+    expect(filterComics(orderForToday(list, "f"), "memes").map((c) => c._id)).toEqual(["s", "n"]);
+  });
   test("while drawing, the drawing card takes the lead slot and adds no extra card", () => {
     const list = [comic("a", "tech"), comic("b", "money"), comic("c", "culture")];
     const ids = (slots: ReturnType<typeof withDrawingLead>) => slots.map((s) => (s === DRAWING_SLOT ? s : s._id));

@@ -18,6 +18,7 @@ export function ComicCard({
   lead,
   read,
   fresh,
+  mine,
   onPress,
 }: {
   comic: Comic;
@@ -25,6 +26,7 @@ export function ComicCard({
   lead: boolean;
   read: boolean;
   fresh?: boolean;
+  mine?: boolean;
   onPress: () => void;
 }) {
   const { width } = useWindowDimensions();
@@ -50,7 +52,7 @@ export function ComicCard({
       <Pressable
         testID={`comicCard_${index}`}
         accessibilityRole="button"
-        accessibilityLabel={`${sectionLabel[comic.section]}: ${comic.title}${read ? ", read" : ""}${comic.sponsored ? `, sponsored${comic.sponsorName ? ` by ${comic.sponsorName}` : ""}` : comic.kind === "commission" ? ", created for you" : comic.isNew ? ", new" : ""}${comic.unverified ? (comic.sponsored ? ", claims not checked" : ", unverified link") : ""}${sublabel ? `, ${sublabel}` : ""}`}
+        accessibilityLabel={`${sectionLabel[comic.section]}: ${comic.title}${read ? ", read" : ""}${mine ? ", your comic" : ""}${comic.sponsored ? `, sponsored${comic.sponsorName ? ` by ${comic.sponsorName}` : ""}` : comic.kind === "commission" ? ", created for you" : comic.isNew ? ", new" : ""}${comic.unverified ? (comic.sponsored ? ", claims not checked" : ", unverified link") : ""}${sublabel ? `, ${sublabel}` : ""}`}
         onPress={() => void press()}
       >
         <CutBox
@@ -69,7 +71,7 @@ export function ComicCard({
           <View style={lead ? styles.leadText : styles.rowText}>
             <SectionTag section={comic.section} unverified={comic.unverified} sponsored={comic.sponsored} />
             <Text style={lead ? styles.leadTitle : styles.rowTitle}>{comic.title}</Text>
-            {comic.sponsored && comic.sponsorName ? <Text style={styles.by}>by {comic.sponsorName}</Text> : null}
+            {comic.sponsored && comic.sponsorName ? <Text style={lead ? styles.leadBy : styles.by}>by {comic.sponsorName}</Text> : null}
             {drawing ? (
               <Text style={styles.meta}>
                 {copy.drawingCard} · {copy.panelsOf(drawn)}
@@ -77,7 +79,7 @@ export function ComicCard({
             ) : null}
           </View>
           {read ? <ReadStamp /> : null}
-          {comic.sponsored ? null : comic.kind === "commission" ? <NewBadge label="CREATED" /> : comic.isNew ? <NewBadge /> : null}
+          {comic.sponsored ? mine ? <NewBadge label="YOUR COMIC" /> : null : comic.kind === "commission" ? <NewBadge label="CREATED" /> : comic.isNew ? <NewBadge /> : null}
         </CutBox>
       </Pressable>
     </Animated.View>
@@ -122,5 +124,6 @@ const styles = StyleSheet.create({
   rowTitle: { ...type.title, fontSize: 19, lineHeight: 24, color: colors.text.hi },
   meta: { ...type.meta, color: colors.text.low },
   by: { ...type.chip, color: colors.text.mid },
+  leadBy: { ...type.body, color: colors.text.hi },
   skel: { backgroundColor: colors.surface[2] },
 });

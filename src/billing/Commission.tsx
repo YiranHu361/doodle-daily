@@ -16,7 +16,7 @@ import { BillingSheet, PencilIcon, QuietLink, SheetHeader, SmallButton } from ".
 
 const DONE: CommissionStatus[] = ["ready", "failed", "refunded"];
 
-export function CommissionButton() {
+export function CommissionButton({ onPromoted }: { onPromoted: () => void }) {
   const deviceId = useBillingDevice();
   const [open, setOpen] = useState(false);
   const [commissionId, setCommissionId] = useState<string | null>(null);
@@ -31,6 +31,7 @@ export function CommissionButton() {
         onStarted={setCommissionId}
         onClose={() => setOpen(false)}
         onFinished={() => setCommissionId(null)}
+        onPromoted={onPromoted}
       />
     </>
   );
@@ -45,15 +46,18 @@ type SheetProps = {
   onFinished: () => void;
 };
 
-function CommissionSheet(props: SheetProps) {
-  const { deviceId, visible, onClose, onFinished } = props;
+function CommissionSheet(props: SheetProps & { onPromoted: () => void }) {
+  const { deviceId, visible, onClose, onFinished, onPromoted } = props;
   const [state, dispatch] = useReducer(promoReducer, initialPromoState);
   const onPrivateDone = useCallback(() => {
     onFinished();
     dispatch({ type: "reset" });
   }, [onFinished]);
-  const done = () => {
-    dispatch({ type: "reset" });
+  const close = () => {
+    if (state.step === "done") {
+      dispatch({ type: "reset" });
+      onPromoted();
+    }
     onClose();
   };
 
@@ -68,15 +72,15 @@ function CommissionSheet(props: SheetProps) {
   const step = { state, dispatch, deviceId };
   const drawing = state.step === "status";
   return (
-    <BillingSheet visible={visible} onClose={onClose} testID="commissionSheet" stickToEnd={state.step === "chat"}>
-      <SheetHeader title={stepTitle(state)} line={stepLine(state)} art={<Robo pose={drawing ? "drawing" : state.step === "done" ? "cheer" : "idle"} size={64} />} onClose={onClose} />
+    <BillingSheet visible={visible} onClose={close} testID="commissionSheet" stickToEnd={state.step === "chat"}>
+      <SheetHeader title={stepTitle(state)} line={stepLine(state)} art={<Robo pose={drawing ? "drawing" : state.step === "done" ? "cheer" : "idle"} size={64} />} onClose={close} />
       {canGoBack(state) ? <QuietLink testID="promoBack" label="Back" onPress={() => dispatch({ type: "back" })} /> : null}
       {state.step === "who" ? <WhoStep dispatch={dispatch} /> : null}
       {state.step === "section" ? <SectionStep dispatch={dispatch} /> : null}
       {state.step === "chat" ? <ChatStep {...step} /> : null}
       {state.step === "link" ? <LinkStep {...step} /> : null}
       {state.step === "status" ? <StatusStep {...step} /> : null}
-      {state.step === "done" ? <DoneStep state={state} onDone={done} /> : null}
+      {state.step === "done" ? <DoneStep state={state} onDone={close} /> : null}
     </BillingSheet>
   );
 }
