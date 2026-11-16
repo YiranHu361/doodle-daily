@@ -1,10 +1,10 @@
 import * as Haptics from "expo-haptics";
 import { useEffect } from "react";
-import { ScrollView, Share, StyleSheet, Text } from "react-native";
+import { ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useReducedMotion } from "../components/a11y";
 import { CutBox, CutButton } from "../components/shapes";
-import { SecondaryButton } from "../components/ui";
+import { PulsingDots, SecondaryButton } from "../components/ui";
 import type { Comic } from "../data/types";
 import { colors, cut, sectionColor, space, type } from "../theme";
 import { useQuiz } from "./hooks";
@@ -20,8 +20,8 @@ const fills: Record<OptionLook, string> = {
 
 export function QuizPage({ comic, width, active }: { comic: Comic; width: number; active: boolean }) {
   const reduce = useReducedMotion();
-  const { data, pending, local, answer } = useQuiz(comic._id, active);
-  const view = quizView(data, pending, local);
+  const { data, writing, pending, local, answer } = useQuiz(comic._id, active);
+  const view = quizView(data, pending, local, writing);
   const justAnswered = !!local;
 
   useEffect(() => {
@@ -35,7 +35,12 @@ export function QuizPage({ comic, width, active }: { comic: Comic; width: number
         <Text style={styles.heading} accessibilityRole="header">
           Quick question
         </Text>
-        {view.kind === "loading" || view.kind === "none" ? (
+        {view.kind === "writing" ? (
+          <View testID="quizWriting" style={styles.writing} accessible accessibilityLabel="Robo is writing the question" accessibilityLiveRegion="polite">
+            <Text style={styles.body}>Robo is writing the question</Text>
+            <PulsingDots color={colors.text.mid} />
+          </View>
+        ) : view.kind === "loading" || view.kind === "none" ? (
           <Text style={styles.body}>{view.kind === "loading" ? "Sharpening the question..." : "No question for this one yet. Check back in a moment."}</Text>
         ) : (
           <>
@@ -79,6 +84,7 @@ const styles = StyleSheet.create({
   heading: { fontFamily: type.displaySm.fontFamily, fontSize: 24, color: colors.text.hi },
   question: { ...type.title, fontSize: 20, color: colors.text.hi },
   body: { ...type.body, color: colors.text.mid },
+  writing: { flexDirection: "row", alignItems: "center", gap: 10 },
   option: { paddingHorizontal: 14, paddingVertical: 12, alignItems: "flex-start" },
   optionText: { ...type.button, color: colors.text.hi },
   optionOnColor: { color: colors.text.onNeon },

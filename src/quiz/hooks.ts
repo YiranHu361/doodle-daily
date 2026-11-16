@@ -6,6 +6,9 @@ import { useDeviceId } from "../data/deviceId";
 import { useFlags } from "../data/flags";
 import type { QuizResult } from "./logic";
 
+export const ENSURE_RETRIES = 3;
+const ENSURE_RETRY_MS = 3000;
+
 export function useQuiz(comicId: string, active: boolean) {
   const { fixtures } = useFlags();
   const deviceId = useDeviceId();
@@ -15,13 +18,26 @@ export function useQuiz(comicId: string, active: boolean) {
   const send = useMutation(api.quiz.answer);
   const [pending, setPending] = useState<number | null>(null);
   const [local, setLocal] = useState<QuizResult | null>(null);
+  const [gaveUp, setGaveUp] = useState(false);
   const asked = useRef(false);
   const shownAt = useRef<number | null>(null);
 
   useEffect(() => {
     if (data !== null || asked.current) return;
     asked.current = true;
-    void ensure({ comicId: id }).catch(() => undefined);
+    let live = true;
+    void (async () => {
+      for (let attempt = 0; attempt <= ENSURE_RETRIES && live; attempt++) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, ENSURE_RETRY_MS));
+        const r = await ensure({ comicId: id }).catch(() => null);
+        if (r && ((r.ok && r.status === "ready") || (!r.ok && r.reason !== "failed"))) break;
+      }
+      if (live) setGaveUp(true);
+    })();
+    return () => {
+      live = false;
+      asked.current = false;
+    };
   }, [data, ensure, id]);
 
   useEffect(() => {
@@ -45,7 +61,7 @@ export function useQuiz(comicId: string, active: boolean) {
     [deviceId, pending, local, send, id],
   );
 
-  return { data: fixtures ? null : data, pending, local, answer };
+  return { data: fixtures ? null : data, writing: !fixtures && data === null && !gaveUp, pending, local, answer };
 }
 
 export function useBoard() {

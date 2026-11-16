@@ -8,6 +8,7 @@ export type OptionLook = "idle" | "picked" | "right" | "wrong" | "dim";
 export type QuizView =
   | { kind: "loading" }
   | { kind: "none" }
+  | { kind: "writing" }
   | { kind: "ask"; question: string; options: string[]; busy: boolean; looks: OptionLook[] }
   | { kind: "answered"; question: string; options: string[]; looks: OptionLook[]; right: boolean; points: number; line: string };
 
@@ -15,9 +16,9 @@ export function challengeMessage(title: string, comicId: string): string {
   return `Beat me on this one: ${title}\n${storyLink(comicId)}`;
 }
 
-export function quizView(data: QuizData | null | undefined, pending: number | null, local: QuizResult | null): QuizView {
+export function quizView(data: QuizData | null | undefined, pending: number | null, local: QuizResult | null, writing = false): QuizView {
   if (data === undefined) return { kind: "loading" };
-  if (data === null) return { kind: "none" };
+  if (data === null) return { kind: writing ? "writing" : "none" };
   const result = data.result ?? local;
   if (!result) {
     const looks = data.options.map((_, i): OptionLook => (pending === null ? "idle" : i === pending ? "picked" : "dim"));

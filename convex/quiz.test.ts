@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { pacificDate } from "./lib/dates";
 import { cleanName, generatedName, QUIZ_MODEL, speedBonus } from "./quiz";
@@ -52,6 +52,43 @@ test("ensure asks the model once, even when two callers race", async () => {
   const rows = await t.run((ctx) => ctx.db.query("quizzes").collect());
   expect(rows).toHaveLength(1);
   expect(rows[0].options[rows[0].answer]).toBe("A boat");
+});
+
+function answerWith(quizzes: unknown[]) {
+  vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+    const body = JSON.parse(String(init.body)) as { model: string; messages: { content: string }[] };
+    calls.push({ model: body.model, prompt: body.messages[0].content });
+    const quiz = quizzes[Math.min(calls.length - 1, quizzes.length - 1)];
+    return new Response(JSON.stringify({ content: [{ type: "text", text: JSON.stringify(quiz) }], stop_reason: "end_turn", usage: { input_tokens: 10, output_tokens: 10 } }), { status: 200 });
+  });
+}
+
+const BAD = { question: "Which?", options: ["Same", "Same", "Same"], answer: 0 };
+const GOOD = { question: "What did Robo buy?", options: ["A kite", "A boat", "A hat"], answer: 1 };
+
+test("ensure asks once more with a repair instruction when the answer fails validation", async () => {
+  const { t, comics } = await setup();
+  answerWith([BAD, GOOD]);
+  expect(await t.action(api.quiz.ensure, { comicId: comics[0] })).toEqual({ ok: true, status: "ready" });
+  expect(calls).toHaveLength(2);
+  expect(calls[1].prompt).toMatch(/broke the rules/);
+});
+
+test("a scheduled ensure tries again a few seconds later when it fails, at most 3 more times", async () => {
+  vi.useFakeTimers();
+  const { t, comics } = await setup();
+  answerWith([BAD, BAD, BAD, BAD, GOOD]);
+  await t.action(internal.quiz.ensureLater, { comicId: comics[0], attempt: 1 });
+  expect(await t.run((ctx) => ctx.db.query("quizzes").collect())).toHaveLength(0);
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(await t.run((ctx) => ctx.db.query("quizzes").collect())).toHaveLength(1);
+  expect(calls).toHaveLength(5);
+
+  calls = [];
+  answerWith([BAD]);
+  await t.action(internal.quiz.ensureLater, { comicId: comics[1], attempt: 1 });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect(calls).toHaveLength(8);
 });
 
 test("ensure without a key or for private or hidden comics makes nothing", async () => {
