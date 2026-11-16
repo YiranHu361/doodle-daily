@@ -7,6 +7,7 @@ describe("quizView", () => {
   test("loading, then no question", () => {
     expect(quizView(undefined, null, null)).toEqual({ kind: "loading" });
     expect(quizView(null, null, null)).toEqual({ kind: "none" });
+    expect(quizView(null, null, null, true)).toEqual({ kind: "writing" });
   });
 
   test("asks with idle options, then marks the pick while it is sent", () => {

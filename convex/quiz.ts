@@ -1,7 +1,7 @@
 import { ConvexError, v, type Infer } from "convex/values";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { action, internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { action, internalAction, internalMutation, mutation, query, type ActionCtx, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { addDays, pacificDate } from "./lib/dates";
 import { checkDeviceId } from "./lib/device";
 import { isVisible } from "./lib/dto";
@@ -16,6 +16,9 @@ export const DAILY_ANSWER_LIMIT = 60;
 export const RIGHT_POINTS = 10;
 export const MAX_SPEED_BONUS = 5;
 const LOCK_TTL_MS = 60_000;
+export const QUIZ_RETRY_MS = 5_000;
+export const QUIZ_RETRIES = 3;
+const QUIZ_REPAIR = "Your last answer broke the rules. Reply with one question of at most 18 words, exactly three different options of at most 8 words each, and answer as 0, 1 or 2.";
 const RANK_SCAN_LIMIT = 1000;
 
 const ADJECTIVES = ["Neon", "Turbo", "Cosmic", "Fuzzy", "Sneaky", "Mighty", "Jolly", "Pixel", "Zippy", "Bouncy", "Crafty", "Sunny", "Lucky", "Rocket", "Velvet", "Wobbly"];
@@ -142,33 +145,51 @@ const ensureResult = v.union(
 );
 type EnsureResult = Infer<typeof ensureResult>;
 
+async function ensureQuiz(ctx: ActionCtx, comicId: Id<"comics">): Promise<EnsureResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+  const holder = crypto.randomUUID();
+  const canGenerate = !!apiKey && getScriptProvider().name === "anthropic";
+  const job = await ctx.runMutation(internal.quiz.reserve, { comicId, holder, canGenerate });
+  if (!job.ok) {
+    if (job.reason === "ready" || job.reason === "busy") return { ok: true, status: job.reason };
+    return { ok: false, reason: job.reason };
+  }
+  let quiz: ReturnType<typeof checkQuiz> = null;
+  try {
+    const prompt = quizPrompt({ title: job.title, realStory: job.realStory, panels: job.captions.map((caption) => ({ caption, scene: "", cast: [] })) });
+    for (const extra of ["", QUIZ_REPAIR]) {
+      const r = await callClaude(apiKey!, extra ? `${prompt}\n${extra}` : prompt, QUIZ_SCHEMA, { timeoutMs: 15_000, retries: 1, maxTokens: 400, model: QUIZ_MODEL });
+      if (!r.ok) {
+        console.warn(`quiz ${comicId}: ${r.reason}`);
+        break;
+      }
+      quiz = checkQuiz(r.json);
+      if (quiz) break;
+    }
+  } finally {
+    await ctx.runMutation(internal.quiz.save, { comicId, holder, quiz: quiz && shuffle(quiz) });
+  }
+  return quiz ? { ok: true, status: "ready" } : { ok: false, reason: "failed" };
+}
+
 export const ensure = action({
   args: { comicId: v.id("comics") },
   returns: ensureResult,
-  handler: async (ctx, { comicId }): Promise<EnsureResult> => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-    const holder = crypto.randomUUID();
-    const canGenerate = !!apiKey && getScriptProvider().name === "anthropic";
-    const job = await ctx.runMutation(internal.quiz.reserve, { comicId, holder, canGenerate });
-    if (!job.ok) {
-      if (job.reason === "ready" || job.reason === "busy") return { ok: true, status: job.reason };
-      return { ok: false, reason: job.reason };
-    }
-    let quiz: ReturnType<typeof checkQuiz> = null;
-    try {
-      const prompt = quizPrompt({ title: job.title, realStory: job.realStory, panels: job.captions.map((caption) => ({ caption, scene: "", cast: [] })) });
-      const r = await callClaude(apiKey!, prompt, QUIZ_SCHEMA, { timeoutMs: 15_000, retries: 1, maxTokens: 400, model: QUIZ_MODEL });
-      quiz = r.ok ? checkQuiz(r.json) : null;
-      if (!r.ok) console.warn(`quiz ${comicId}: ${r.reason}`);
-    } finally {
-      await ctx.runMutation(internal.quiz.save, { comicId, holder, quiz: quiz && shuffle(quiz) });
-    }
-    return quiz ? { ok: true, status: "ready" } : { ok: false, reason: "failed" };
+  handler: async (ctx, { comicId }): Promise<EnsureResult> => ensureQuiz(ctx, comicId),
+});
+
+export const ensureLater = internalAction({
+  args: { comicId: v.id("comics"), attempt: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { comicId, attempt }) => {
+    const r = await ensureQuiz(ctx, comicId);
+    if (!r.ok && r.reason === "failed" && attempt <= QUIZ_RETRIES) await ctx.scheduler.runAfter(QUIZ_RETRY_MS, internal.quiz.ensureLater, { comicId, attempt: attempt + 1 });
+    return null;
   },
 });
 
 export async function scheduleQuiz(ctx: MutationCtx, comicId: Id<"comics">): Promise<void> {
-  await ctx.scheduler.runAfter(0, api.quiz.ensure, { comicId });
+  await ctx.scheduler.runAfter(0, internal.quiz.ensureLater, { comicId, attempt: 1 });
 }
 
 const result = v.object({ choice: v.number(), right: v.boolean(), answer: v.number(), points: v.number() });
