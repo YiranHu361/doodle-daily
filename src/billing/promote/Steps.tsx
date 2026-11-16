@@ -4,7 +4,7 @@ import { StyleSheet, Text, TextInput, View } from "react-native";
 import { api } from "../../../convex/_generated/api";
 import { CutBox, CutButton } from "../../components/shapes";
 import { useToast } from "../../components/Toast";
-import { PrimaryButton, PulsingDots, SecondaryButton } from "../../components/ui";
+import { PrimaryButton, PulsingDots } from "../../components/ui";
 import { useToday } from "../../data/hooks";
 import { ShareHost, useShare } from "../../share/useShare";
 import { colors, cut, sectionColor, type } from "../../theme";
@@ -13,14 +13,11 @@ import { openCheckout, usePlus } from "../hooks";
 import { paymentErrorLine, type CommissionStatus } from "../logic";
 import { PayButtons, useTestPay } from "../PayButtons";
 import {
-  canCheck,
   canPay,
   canSend,
-  decodeCheck,
   decodeReply,
   decodeStart,
   doneLine,
-  droppedClaims,
   LINK_MAX,
   MESSAGE_MAX,
   openingLine,
@@ -200,7 +197,6 @@ export function ChatStep({ state, dispatch, deviceId }: StepProps) {
 }
 
 export function LinkStep({ state, dispatch, deviceId }: StepProps) {
-  const check = useAction(api.promote.check);
   const start = useAction(api.promote.start);
   const testPay = useTestPay(deviceId);
   const { testCard } = usePlus();
@@ -209,24 +205,11 @@ export function LinkStep({ state, dispatch, deviceId }: StepProps) {
   const section = state.section;
   const persona = state.persona;
 
-  const runCheck = async () => {
-    if (!canCheck(state)) return;
-    dispatch({ type: "pending", pending: "check" });
-    try {
-      const out = decodeCheck(await check({ deviceId, link: state.link.trim(), brief }));
-      dispatch(out.kind === "checked" ? { type: "checked", check: out.check } : { type: "error", message: out.message });
-    } catch {
-      dispatch({ type: "error", message: "Robo can't reach that page right now. Try again in a minute." });
-    }
-  };
-
   const pay = async (how: "test" | "checkout") => {
     if (!canPay(state)) return;
     dispatch({ type: "pending", pending: "start" });
     try {
-      const out = decodeStart(
-        await start({ deviceId, persona, section, brief, link: state.link.trim(), ...(state.unchecked ? { unchecked: true } : {}) }),
-      );
+      const out = decodeStart(await start({ deviceId, persona, section, brief, link: state.link.trim() }));
       if (out.kind === "error") return dispatch({ type: "error", message: out.message });
       dispatch({ type: "started", commissionId: out.commissionId, checkoutUrl: out.url });
       if (how === "checkout") return await openCheckout(out.url);
@@ -237,11 +220,10 @@ export function LinkStep({ state, dispatch, deviceId }: StepProps) {
     }
   };
 
-  const result = state.check;
-  const crossed = droppedClaims(result);
   return (
     <>
-      <Text style={styles.hint}>A page that shows what {brief.name} says: your site, a store page, a launch post.</Text>
+      <BriefCard brief={brief} />
+      <Text style={styles.hint}>A page that backs up {brief.name}: your site, a store page, a launch post.</Text>
       <TextInput
         testID="promoLink"
         value={state.link}
@@ -254,63 +236,20 @@ export function LinkStep({ state, dispatch, deviceId }: StepProps) {
         autoCorrect={false}
         keyboardType="url"
         returnKeyType="go"
-        onSubmitEditing={() => void runCheck()}
         editable={state.pending === null}
-        accessibilityLabel="Link that backs it up"
+        accessibilityLabel="The link that backs it up"
       />
-      {!result ? (
-        <PrimaryButton
-          testID="promoCheck"
-          label={state.pending === "check" ? "Robo is reading the page" : "Check the claims"}
-          onPress={() => void runCheck()}
-          disabled={!canCheck(state)}
-        >
-          {state.pending === "check" ? <PulsingDots /> : null}
-        </PrimaryButton>
-      ) : result.readable ? (
-        <CutBox testID="promoBrief" cut={cut.card} fill={colors.surface[2]} stroke={colors.neon.volt} style={styles.brief}>
-          <Text style={styles.label}>CHECKED AGAINST {result.site.toUpperCase()}</Text>
-          <Text style={styles.briefName}>{brief.name}</Text>
-          <Text style={styles.body}>{brief.pitch}</Text>
-          <View style={styles.claims}>
-            {result.claims.map((c, i) => (
-              <View key={i} style={styles.checkRow} accessible accessibilityLabel={`${c.text}: ${c.backed ? "the page says so" : "the page does not say so, left out"}`}>
-                <Text style={[styles.mark, { color: c.backed ? colors.neon.lime : colors.state.error }]}>{c.backed ? "\u2713" : "\u2717"}</Text>
-                <Text style={[styles.claim, styles.flex, c.backed ? null : styles.crossed]}>{c.text}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={styles.cta}>{brief.cta}</Text>
-          {crossed ? <Text style={styles.hint}>Crossed claims are not on the page, so Robo leaves them out of the comic.</Text> : null}
-        </CutBox>
-      ) : (
-        <CutBox cut={cut.card} fill={colors.surface[2]} stroke={colors.stamp} style={styles.brief}>
-          <Text style={styles.body}>Robo could not read that page{result.site ? ` on ${result.site}` : ""}.</Text>
-          {state.unchecked ? (
-            <Text style={styles.hint}>Your comic will be marked &quot;Claims not checked&quot;.</Text>
-          ) : (
-            <>
-              <SecondaryButton testID="promoTryAnother" label="Try another link" onPress={() => dispatch({ type: "tryAnotherLink" })} />
-              <SecondaryButton testID="promoUnchecked" label="Continue, claims not checked" onPress={() => dispatch({ type: "continueUnchecked" })} />
-            </>
-          )}
-        </CutBox>
-      )}
-      {canPay(state) || state.pending === "start" ? (
-        <PayButtons
-          testID="promoPay"
-          testCard={testCard}
-          price={PROMO_PRICE}
-          checkoutLabel={payLabel(section)}
-          busy={state.pending === "start"}
-          disabled={!canPay(state)}
-          error={state.error}
-          onTestPay={() => void pay("test")}
-          onCheckout={() => void pay("checkout")}
-        />
-      ) : state.error ? (
-        <Text style={styles.error}>{state.error}</Text>
-      ) : null}
+      <PayButtons
+        testID="promoPay"
+        testCard={testCard}
+        price={PROMO_PRICE}
+        checkoutLabel={payLabel(section)}
+        busy={state.pending === "start"}
+        disabled={!canPay(state)}
+        error={state.error}
+        onTestPay={() => void pay("test")}
+        onCheckout={() => void pay("checkout")}
+      />
     </>
   );
 }
@@ -408,13 +347,9 @@ const styles = StyleSheet.create({
   body: { ...type.body, fontSize: 16, color: colors.text.hi },
   claims: { gap: 4 },
   claim: { ...type.body, fontSize: 15, color: colors.text.mid },
-  checkRow: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
-  mark: { ...type.button, width: 18 },
-  crossed: { textDecorationLine: "line-through", color: colors.text.low },
   cta: { ...type.button, color: colors.neon.volt },
   hint: { ...type.meta, color: colors.text.mid },
   error: { ...type.body, fontSize: 15, color: colors.state.error },
-  fine: { ...type.meta, color: colors.text.low, textAlign: "center" },
   inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   chatInput: {
     ...type.body,

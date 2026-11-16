@@ -5,10 +5,8 @@ export type Persona = "creator" | "founder";
 export type Who = Persona | "me";
 export type Brief = { name: string; pitch: string; claims: string[]; cta: string };
 export type ChatMessage = { role: "user" | "robo"; text: string; isBrief?: boolean };
-export type CheckedClaim = { text: string; backed: boolean };
-export type LinkCheck = { readable: boolean; site: string; claims: CheckedClaim[] };
 export type PromoStep = "who" | "me" | "section" | "chat" | "link" | "status" | "done";
-export type Pending = "reply" | "transcribe" | "check" | "start" | null;
+export type Pending = "reply" | "transcribe" | "start" | null;
 export type FailReason = "limit" | "not_allowed" | "bad_input" | "unavailable";
 
 export const QUESTION_MAX = 3;
@@ -52,8 +50,6 @@ export type PromoState = {
   questions: number;
   brief: Brief | null;
   link: string;
-  check: LinkCheck | null;
-  unchecked: boolean;
   commissionId: string | null;
   checkoutUrl: string | null;
   comicId: string | null;
@@ -69,8 +65,6 @@ export const initialPromoState: PromoState = {
   questions: 0,
   brief: null,
   link: "",
-  check: null,
-  unchecked: false,
   commissionId: null,
   checkoutUrl: null,
   comicId: null,
@@ -88,9 +82,6 @@ export type PromoAction =
   | { type: "brief"; brief: Brief }
   | { type: "toLink" }
   | { type: "link"; link: string }
-  | { type: "checked"; check: LinkCheck }
-  | { type: "tryAnotherLink" }
-  | { type: "continueUnchecked" }
   | { type: "started"; commissionId: string; checkoutUrl: string }
   | { type: "ready"; comicId: string | null }
   | { type: "error"; message: string }
@@ -122,13 +113,7 @@ export function promoReducer(state: PromoState, action: PromoAction): PromoState
     case "toLink":
       return state.step === "chat" && state.brief ? { ...state, step: "link", error: null } : state;
     case "link":
-      return { ...state, link: action.link, check: null, unchecked: false, error: null };
-    case "checked":
-      return { ...state, check: action.check, unchecked: false, pending: null, error: null };
-    case "tryAnotherLink":
-      return { ...state, link: "", check: null, unchecked: false, error: null };
-    case "continueUnchecked":
-      return state.check && !state.check.readable ? { ...state, unchecked: true } : state;
+      return { ...state, link: action.link, error: null };
     case "started":
       return { ...state, step: "status", commissionId: action.commissionId, checkoutUrl: action.checkoutUrl, pending: null, error: null };
     case "ready":
@@ -169,13 +154,8 @@ export function looksLikeUrl(text: string): boolean {
   return t.length <= LINK_MAX && /^https?:\/\/[^\s.]+\.[^\s]+$/i.test(t);
 }
 
-export function canCheck(state: PromoState): boolean {
-  return state.step === "link" && !state.pending && !state.check && looksLikeUrl(state.link);
-}
-
 export function canPay(state: PromoState): boolean {
-  if (state.step !== "link" || state.pending || !state.check || !state.section) return false;
-  return state.check.readable || state.unchecked;
+  return state.step === "link" && !state.pending && !!state.section && looksLikeUrl(state.link);
 }
 
 export function payLabel(section: Section, pending = false): string {
@@ -217,7 +197,7 @@ export function stepLine(state: PromoState): string {
     case "chat":
       return "Type or talk. Robo asks a few short questions.";
     case "link":
-      return "Robo checks every claim against this page.";
+      return "Readers tap through to this page.";
     case "status":
     case "done":
       return state.section ? `In ${sectionName(state.section)}, for every reader.` : "";
@@ -231,10 +211,6 @@ export function briefAsText(brief: Brief): string {
 
 export function replyMessages(messages: readonly ChatMessage[]): { role: "user" | "robo"; text: string }[] {
   return messages.map(({ role, text }) => ({ role, text }));
-}
-
-export function droppedClaims(check: LinkCheck | null): number {
-  return check && check.readable ? check.claims.filter((c) => !c.backed).length : 0;
 }
 
 export function promoStatusLine(status: CommissionStatus, section: Section): string {
@@ -301,15 +277,6 @@ export function decodeReply(raw: unknown): { kind: "question"; text: string } | 
     if (brief) return { kind: "brief", brief };
   }
   return decodeFailure(raw);
-}
-
-export function decodeCheck(raw: unknown): { kind: "checked"; check: LinkCheck } | Failure {
-  if (!isObj(raw) || raw.kind !== "checked" || typeof raw.readable !== "boolean") return decodeFailure(raw);
-  const claims = (Array.isArray(raw.claims) ? raw.claims : [])
-    .filter(isObj)
-    .map((c) => ({ text: text(c.text), backed: c.backed === true }))
-    .filter((c): c is CheckedClaim => c.text !== null);
-  return { kind: "checked", check: { readable: raw.readable, site: text(raw.site) ?? "", claims } };
 }
 
 export function decodeTranscript(raw: unknown): { kind: "text"; text: string } | Failure {

@@ -158,10 +158,12 @@ function RealStoryPage({
         </Text>
         {comic.sponsored ? (
           <View style={styles.sourceRow}>
-            <Text style={styles.sourceLabel}>{comic.sponsorName ? `Sponsored by ${comic.sponsorName}` : "Sponsored"}</Text>
-            <Text testID="sourceName" style={styles.sourceName}>
-              {comic.unverified || !comic.sourceName ? "Claims not checked" : `Claims checked against ${comic.sourceName}`}
-            </Text>
+            <Text style={styles.sourceLabel}>{comic.sponsorName ? `SPONSORED · by ${comic.sponsorName}` : "SPONSORED"}</Text>
+            {comic.sourceName ? (
+              <Text testID="sourceName" style={styles.sourceName}>
+                Source: {comic.sourceName}
+              </Text>
+            ) : null}
           </View>
         ) : (
           <View style={styles.sourceRow}>

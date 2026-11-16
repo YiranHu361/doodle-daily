@@ -121,10 +121,8 @@ export function renderStoryPage(story: Story, pageUrl: string): string {
   const color = SECTION_COLOR[story.section];
   const description = clip(story.realStory, 200);
   const source = safeHref(story.sourceUrl);
-  const sourceLabel = story.sponsored ? e(story.sponsorName ? `Sponsored by ${story.sponsorName}` : "Sponsored") : "Source";
-  const sourceName = story.sponsored
-    ? e(story.unverified || !story.sourceName ? "Claims not checked" : `Claims checked against ${story.sourceName}`)
-    : e(story.sourceName || "Unknown source");
+  const sourceLabel = story.sponsored ? e(story.sponsorName ? `SPONSORED · by ${story.sponsorName}` : "SPONSORED") : "Source";
+  const sourceName = story.sponsored ? e(story.sourceName ? `Source: ${story.sourceName}` : "") : e(story.sourceName || "Unknown source");
   const sourceLink = source ? `<a href="${e(source)}" rel="noopener nofollow">${story.sponsored ? e(story.ctaLabel || "Open source") : sourceName}</a>` : "";
   const tags = [
     `<span class="tag">${SECTION_LABEL[story.section]}</span>`,
@@ -168,7 +166,7 @@ ${panels}
 <h2>THE REAL STORY</h2>
 <p>${e(story.realStory)}</p>
 <p class="label">${sourceLabel}</p>
-<p class="source">${story.sponsored ? `${sourceName}${sourceLink ? `<br>${sourceLink}` : ""}` : sourceLink || sourceName}</p>
+<p class="source">${story.sponsored ? [sourceName, sourceLink].filter(Boolean).join("<br>") : sourceLink || sourceName}</p>
 </section>
 <a class="cta" href="doodledaily://reader/${encodeURIComponent(story.id)}">Open in Doodle Daily</a>
 </main>

@@ -14,7 +14,8 @@ const SECRET = "ws_test_secret_value";
 const DEVICE = "device-1234-abcd";
 const COMMISSION_PLAN = "plan_commission_test";
 const PROMO_PLAN = "plan_promo_test";
-const PRODUCT_URL = "https://acmenotes.example.com/launch";
+const PRODUCT_URL = "https://acmenotes.app/launch";
+const SITE = "acmenotes.app";
 const DEAD_URL = "https://gone.example.com/launch";
 const PRODUCT_PAGE =
   '<html><head><meta property="og:site_name" content="Acme Notes"><title>Acme Notes 2.0 is here</title><meta name="description" content="The note app for founders."></head><body><h1>Acme Notes 2.0</h1><p>Acme Notes now has 40,000 users and syncs offline on every phone. Try the beta today.</p></body></html>';
@@ -157,7 +158,7 @@ describe("promote:reply", () => {
 });
 
 describe("promote:check and promote:start", () => {
-  test("check ticks what the page says; start drops crossed claims and charges the promo plan", async () => {
+  test("check (kept, no longer called by the app) ticks what the page says", async () => {
     const t = convexTest(schema, modules);
     const checked = await t.action(api.promote.check, { deviceId: DEVICE, link: PRODUCT_URL, brief: BRIEF });
     expect(checked).toEqual({
@@ -169,12 +170,18 @@ describe("promote:check and promote:start", () => {
         { text: "Won an Apple Design Award", backed: false },
       ],
     });
+  });
+
+  test("start keeps every claim, never reads the page and charges the promo plan", async () => {
+    const t = convexTest(schema, modules);
     const res = await t.action(api.promote.start, { deviceId: DEVICE, persona: "founder", section: "tech", brief: BRIEF, link: PRODUCT_URL });
     if (res.kind !== "checkout") throw new Error("start failed");
+    expect(modelCalls).toBe(0);
+    expect(vi.mocked(fetch).mock.calls.map(([u]) => String(u))).not.toContain(PRODUCT_URL);
     expect(calls.at(-1)!.body).toMatchObject({ variant_id: PROMO_PLAN, metadata: { kind: "commission", deviceId: DEVICE, commissionId: res.commissionId } });
     const row = await t.run(async (ctx) => ctx.db.get(res.commissionId as Id<"commissions">));
-    expect(row!.promo).toMatchObject({ persona: "founder", section: "tech", name: "Acme Notes", claims: ["Has 40,000 users"], site: "Acme Notes", cta: "Try the beta" });
-    expect(row!.facts.join(" ")).not.toMatch(/Apple/);
+    expect(row!.promo).toMatchObject({ persona: "founder", section: "tech", name: "Acme Notes", claims: ["Has 40,000 users", "Won an Apple Design Award"], site: SITE, cta: "Try the beta" });
+    expect(row!.facts.join(" ")).toMatch(/Apple Design Award/);
     expect(row!.unverified).toBeUndefined();
   });
 
@@ -186,17 +193,20 @@ describe("promote:check and promote:start", () => {
     expect(calls.at(-1)!.body).toMatchObject({ variant_id: COMMISSION_PLAN });
   });
 
-  test("an unreadable link needs the person's say-so and then yields an unverified promo", async () => {
+  test("start only needs a well-formed https link; an unreadable page is fine and never unverified", async () => {
     const t = convexTest(schema, modules);
     expect(await t.action(api.promote.check, { deviceId: DEVICE, link: DEAD_URL, brief: BRIEF })).toMatchObject({ kind: "checked", readable: false, site: "gone.example.com" });
-    expect(await t.action(api.promote.start, { deviceId: DEVICE, persona: "founder", section: "money", brief: BRIEF, link: DEAD_URL })).toMatchObject({ kind: "error", reason: "bad_input" });
-    const res = await t.action(api.promote.start, { deviceId: DEVICE, persona: "founder", section: "money", brief: BRIEF, link: DEAD_URL, unchecked: true });
+    for (const link of [DEAD_URL, "http://acmenotes.app/launch", "not a link"]) {
+      expect(await t.action(api.promote.start, { deviceId: DEVICE, persona: "founder", section: "money", brief: BRIEF, link })).toMatchObject({ kind: "error", reason: "bad_input" });
+    }
+    const dead = "https://gone-for-good.app/launch";
+    const res = await t.action(api.promote.start, { deviceId: DEVICE, persona: "founder", section: "money", brief: BRIEF, link: dead });
     if (res.kind !== "checkout") throw new Error("start failed");
     await seedIssue(t);
     await pay(t, res.commissionId);
     await settle(t, 30_000);
     const today = (await t.query(api.editions.today, {}))!;
-    expect(today.comics[1]).toMatchObject({ sponsored: true, unverified: true, section: "money", sourceUrl: DEAD_URL, sourceName: "gone.example.com" });
+    expect(today.comics[1]).toMatchObject({ sponsored: true, unverified: false, section: "money", sourceUrl: dead, sourceName: "gone-for-good.app" });
   });
 
   test("ad rules refuse at start and nothing is charged", async () => {
@@ -240,14 +250,13 @@ describe("a paid promo", () => {
       sponsorKind: "founder",
       ctaLabel: "Try the beta",
       sourceUrl: PRODUCT_URL,
-      sourceName: "Acme Notes",
+      sourceName: SITE,
       unverified: false,
       isNew: false,
     });
     expect(today.comics[0].sponsored).toBe(false);
     const comic = await t.run(async (ctx) => ctx.db.get(today.comics[1]._id));
     expect(comic!.owner).toBeUndefined();
-    expect(comic!.panels.map((p) => p.caption).join(" ")).not.toMatch(/Apple/);
   });
 
   test("a payment on the $1 plan still pays a commission", async () => {

@@ -7,8 +7,8 @@ import { checkDeviceId } from "./lib/device";
 import { adRefusal } from "./lib/filter";
 import { fetchText, sleep } from "./lib/http";
 import { isRetryableStatus } from "./lib/retry";
-import { UNVERIFIED_SENTENCE } from "./lib/script";
 import { cut, stripHtml } from "./lib/text";
+import { isRealSource } from "./lib/urls";
 import { createCheckout, planId, whopConfig } from "./lib/whop";
 import { callClaude } from "./providers/anthropic";
 import { section, sponsorKind } from "./schema";
@@ -29,7 +29,6 @@ export const PROMO_MESSAGES = {
     "Robo can't promote that. Sponsored comics stay friendly: no gambling, adult content, weapons, drugs, politics, health or money promises, or digs at anyone.",
   bad_input: "Robo didn't catch that. Try again in your own words.",
   bad_link: "That doesn't look like a page Robo can open. Paste a full https:// link.",
-  unreadable: "Robo could not open that page. Try another link, or continue with the claims not checked.",
   audio_too_big: "That clip is too long. Keep it under a minute.",
   spend_cap: "Robo is out of crayons for today. Try again tomorrow.",
   unavailable: "Robo can't answer right now. Try again in a minute.",
@@ -334,46 +333,42 @@ export const check = action({
 
 // ---------- pay and publish ----------
 
-export function promoFacts(p: { persona: typeof sponsorKind.type; name: string; pitch: string; claims: string[]; cta: string; site: string }, readable: boolean): string[] {
-  if (!readable) return [`A sponsor's link from ${p.site} is about ${p.name}: ${p.pitch.replace(/[.!?]+$/, "")}. ${UNVERIFIED_SENTENCE}`];
+export function promoFacts(p: { persona: typeof sponsorKind.type; name: string; pitch: string; claims: string[]; cta: string; site: string }): string[] {
   return [
     `This is a sponsored comic paid for by ${p.name}, made by a ${p.persona}.`,
     `${p.name} describes itself like this: ${p.pitch.replace(/[.!?]+$/, "")}.`,
-    ...p.claims.map((claim) => `${p.site} says: ${claim.replace(/[.!?]+$/, "")}.`),
+    ...p.claims.map((claim) => `${p.name} says: ${claim.replace(/[.!?]+$/, "")}.`),
     `Readers are invited to: ${p.cta}.`,
     "Keep it light and friendly; the cast enjoys the product, nobody is mocked.",
   ];
 }
 
 const startResult = v.union(
-  v.object({ kind: v.literal("checkout"), commissionId: v.id("commissions"), url: v.string(), section, readable: v.boolean(), claims: v.array(checkedClaim) }),
+  v.object({ kind: v.literal("checkout"), commissionId: v.id("commissions"), url: v.string(), section }),
   failure,
 );
 type StartResult = typeof startResult.type;
 
 export const start = action({
-  args: { deviceId: v.string(), persona: sponsorKind, section, brief, link: v.string(), unchecked: v.optional(v.boolean()) },
+  args: { deviceId: v.string(), persona: sponsorKind, section, brief, link: v.string() },
   returns: startResult,
   handler: async (ctx, args): Promise<StartResult> => {
     checkDeviceId(args.deviceId);
     const b = cleanBrief(args.brief);
     if (!b) return fail("bad_input");
     const link = parseLink(args.link);
-    if (!link) return fail("bad_input", PROMO_MESSAGES.bad_link);
+    if (!link || !isRealSource(link)) return fail("bad_input", PROMO_MESSAGES.bad_link);
     if (adRefusal(briefText(b))) return fail("not_allowed");
     if ((await ctx.runQuery(internal.pipeline.capLeft, { date: pacificDate(Date.now()) })) < IMAGES_PER_COMIC) return fail("unavailable", PROMO_MESSAGES.spend_cap);
     if (!whopConfig().ok) return fail("unavailable");
-    const checked = await checkClaims(link, b);
-    if (!checked.ok) return fail("unavailable");
-    if (!checked.readable && args.unchecked !== true) return fail("bad_input", PROMO_MESSAGES.unreadable);
     const promo = {
       persona: args.persona,
       section: args.section,
       name: b.name,
       pitch: b.pitch,
-      claims: checked.readable ? checked.claims.filter((c) => c.backed).map((c) => c.text) : [],
+      claims: b.claims,
       cta: b.cta,
-      site: checked.site,
+      site: publisherFor(link),
     };
     const headline = cut(`${b.name}: ${b.pitch}`, 200);
     const commissionId = await ctx.runMutation(internal.commissions.create, {
@@ -381,8 +376,7 @@ export const start = action({
       topic: headline,
       link,
       headline,
-      facts: promoFacts(promo, checked.readable),
-      unverified: checked.readable ? undefined : true,
+      facts: promoFacts(promo),
       promo,
     });
     const checkout = await createCheckout(planId("promo"), { kind: "commission", deviceId: args.deviceId, commissionId });
@@ -391,6 +385,6 @@ export const start = action({
       console.error(`promo checkout failed: ${checkout.error}`);
       return fail("unavailable");
     }
-    return { kind: "checkout", commissionId, url: checkout.url, section: args.section, readable: checked.readable, claims: checked.claims };
+    return { kind: "checkout", commissionId, url: checkout.url, section: args.section };
   },
 });
